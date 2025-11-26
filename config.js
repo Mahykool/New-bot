@@ -17,51 +17,33 @@ global.__dirname = (url) => dirname(fileURLToPath(url));
 // Dueño raíz (máxima autoridad) — usar solo números sin @s.whatsapp.net
 global.roowner = ['56969066865'] // agrega aquí los números que pueden dar/quitar mods
 
-// Lista de co-dueños (solo uno más aparte de ti)
-// Formato: [ ['56912345678', 'Nombre', true], ... ]
+// Lista de co-dueños (formato: [ ['56912345678', 'Nombre', true], ... ])
 global.owner = [
-  ['56969066865', 'Mahykol 👑 Creador', true],   // Tu número y título especial
-  ['569XXXXXXXX', 'Co-Dueño', true]             // Reemplaza XXXXXXXX por el número real (sin @)
+  ['56969066865', 'Mahykol 👑 Creador', true],
+  ['569XXXXXXXX', 'Co-Dueño', true]
 ]
 
-// Moderadores (admin virtuales: pueden banear/kickear)
-import path from 'path'
+// NOTA: La gestión de roles (roowner, owners, mods, suittag, prems) se centraliza
+// en src/database/roles.json y src/database/mods.json mediante lib-roles.js y lib/mods-utils.js.
+// Para compatibilidad con plugins antiguos, al arrancar sincronizamos global.* desde lib-roles.
 
-const modsPath = path.join(process.cwd(), 'src', 'database', 'mods.json')
-// Normalizador: convierte cualquier entrada a 569XXXXXXXX@s.whatsapp.net
-const normalize = n => String(n || '').replace(/@s\.whatsapp\.net/g, '').replace(/\D/g, '') + '@s.whatsapp.net'
-
-try {
-  const raw = require(modsPath)
-  global.mods = Array.isArray(raw) ? raw.map(normalize) : []
-} catch (e) {
-  global.mods = []
-}
-
-// Suittag y prems (privilegios secundarios)
-global.suittag = [
-  '56961199174@s.whatsapp.net'
-]
-global.prems = [
-  '56961199174@s.whatsapp.net'
-]
-
+// Bot number y demás
 global.botNumber = '56900000000' // ← Cambiar este número según el que conecte el bot
 
 // Información del bot 
 global.libreria = 'Baileys'
 global.baileys = 'V 6.7.9'
 global.languaje = 'Español'
-global.vs = '1.0.0'              // versión inicial de Swill
-global.vsJB = '1.0'              // versión secundaria si usas variantes
-global.nameqr = 'SwillQR'        // nombre del archivo QR
-global.namebot = 'Swill-IA'      // nombre oficial del bot
-global.sessions = 'Swill-sessions' // carpeta de sesiones
+global.vs = '1.0.0'
+global.vsJB = '1.0'
+global.nameqr = 'SwillQR'
+global.namebot = 'Swill-IA'
+global.sessions = 'Swill-sessions'
 global.jadi = 'jadibts'
-global.SwillJadibts = true       // activación de multi-sesión
+global.SwillJadibts = true
 global.Choso = true
 global.prefix = ['.', '!', '/', '#', '%']
-global.apikey = 'SwillIA-Key'    // clave principal para APIs
+global.apikey = 'SwillIA-Key'
 
 // Branding y créditos
 global.packname = 'Swill Stickers 🌙'
@@ -88,20 +70,18 @@ global.axios = axios
 global.moment = moment
 
 // Enlaces oficiales de Swill
-global.comunidad1 = 'https://chat.whatsapp.com/K02sv6Fm87fBQvlNKIGOQB'   // Comunidad principal
-global.gp1 = 'https://chat.whatsapp.com/C01CZDKL88uEFRZqlLxOdg?mode=wwt' // Grupo general principal
+global.comunidad1 = 'https://chat.whatsapp.com/K02sv6Fm87fBQvlNKIGOQB'
+global.gp1 = 'https://chat.whatsapp.com/C01CZDKL88uEFRZqlLxOdg?mode=wwt'
 
-// Espacios reservados (inactivos por ahora)
-global.comunidad2 = ''   // Comunidad secundaria (pendiente)
-global.comunidad3 = ''   // Otra comunidad futura
-global.gp2 = ''          // Grupo secundario
-global.gp3 = ''          // Otro grupo futuro
-global.channel = ''      // Canal oficial (pendiente)
-global.channel2 = ''     // Canal secundario (pendiente)
-global.md = ''           // Repositorio GitHub (pendiente)
-global.correo = ''       // Correo de contacto (pendiente)
-
-// Apis para las descargas y más
+// Espacios reservados
+global.comunidad2 = ''
+global.comunidad3 = ''
+global.gp2 = ''
+global.gp3 = ''
+global.channel = ''
+global.channel2 = ''
+global.md = ''
+global.correo = ''
 
 // APIs oficiales de Swill
 global.APIs = {
@@ -111,7 +91,7 @@ global.APIs = {
   delirius: 'https://delirius-apiofc.vercel.app',
   siputzx: 'https://api.siputzx.my.id',
   mayapi: 'https://mayapi.ooguy.com',
-  swillapi: '' // espacio reservado para tu propia API futura
+  swillapi: ''
 }
 
 global.APIKeys = {
@@ -119,7 +99,7 @@ global.APIKeys = {
   'https://api.lolhuman.xyz': 'API_KEY',
   'https://api.betabotz.eu.org': 'API_KEY',
   'https://mayapi.ooguy.com': 'may-f53d1d49',
-  'https://api.swill.com': '' // clave reservada para tu API futura
+  'https://api.swill.com': ''
 }
 
 // Endpoints de IA
@@ -131,29 +111,61 @@ global.SIPUTZX_AI = {
 }
 
 global.chatDefaults = {
-  isBanned: false,       // Si el chat está baneado
-  sAutoresponder: '',    // Texto de autorespuesta personalizada
-  welcome: true,         // Mensajes de bienvenida activos
-  autolevelup: false,    // Subida automática de nivel (XP)
-  autoAceptar: false,    // Auto-aceptar solicitudes
-  autosticker: false,    // Convierte imágenes en stickers automáticamente
-  autoRechazar: false,   // Auto-rechazar solicitudes
-  autoresponder: false,  // Respuestas automáticas
-  detect: true,          // Detecta entradas/salidas de usuarios
-  antiBot: false,        // Bloquea otros bots
-  antiBot2: false,       // Bloqueo alternativo de bots
-  modoadmin: false,      // Solo admins pueden usar comandos
-  antiLink: true,        // Bloquea links externos
-  antiImg: false,        // Bloquea imágenes
-  reaction: false,       // Reacciones automáticas
-  nsfw: false,           // Contenido adulto (apagado por defecto)
-  antifake: false,       // Bloquea números falsos
-  delete: false,         // Borra mensajes prohibidos
-  expired: 0,            // Tiempo de expiración de configuración
-  antiLag: false,        // Prevención de lag
-  per: [],               // Lista de permisos especiales
-  antitoxic: false       // Filtro de mensajes ofensivos
+  isBanned: false,
+  sAutoresponder: '',
+  welcome: true,
+  autolevelup: false,
+  autoAceptar: false,
+  autosticker: false,
+  autoRechazar: false,
+  autoresponder: false,
+  detect: true,
+  antiBot: false,
+  antiBot2: false,
+  modoadmin: false,
+  antiLink: true,
+  antiImg: false,
+  reaction: false,
+  nsfw: false,
+  antifake: false,
+  delete: false,
+  expired: 0,
+  antiLag: false,
+  per: [],
+  antitoxic: false
 }
+
+// -----------------------------
+// Shim de compatibilidad (sincroniza global.* desde lib-roles)
+// -----------------------------
+;(async () => {
+  try {
+    // intenta importar la librería central de roles (lib-roles.js)
+    // ajusta la ruta si tu estructura es distinta (ej: './lib/lib-roles.js')
+    const rolesLib = await import('./lib/lib-roles.js')
+    // listRole devuelve arrays; hasRole/addRole/removeRole también disponibles
+    const { listRole } = rolesLib
+
+    // sincroniza globals para compatibilidad con plugins antiguos
+    // convierto a formato esperado por plugins (JID completos para suittag/prems/mods)
+    const mods = listRole('mods') || []
+    const suittag = listRole('suittag') || []
+    const prems = listRole('prems') || []
+    const roowners = listRole('roowner') || []
+    const owners = listRole('owners') || []
+
+    // asignaciones seguras
+    global.mods = Array.isArray(mods) ? mods : []
+    global.suittag = Array.isArray(suittag) ? suittag : []
+    global.prems = Array.isArray(prems) ? prems : []
+    // roowner/owner en config.js siguen siendo seeds; aquí los sincronizamos si roles.json tiene valores
+    if (Array.isArray(roowners) && roowners.length) global.roowner = roowners.map(r => String(r).replace(/@s\.whatsapp\.net/g, ''))
+    if (Array.isArray(owners) && owners.length) global.owner = owners.map(o => Array.isArray(o) ? [String(o[0]).replace(/@s\.whatsapp\.net/g, ''), o[1] || '', !!o[2]] : [String(o).replace(/@s\.whatsapp\.net/g, ''), '', false])
+  } catch (e) {
+    // si falla la sincronización no interrumpe el arranque; los plugins nuevos usan lib-roles directamente
+    console.error('Roles shim sync failed:', e)
+  }
+})()
 
 let file = fileURLToPath(import.meta.url)
 watchFile(file, () => {
