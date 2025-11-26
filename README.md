@@ -1,6 +1,5 @@
 # `👑 SWILL - V1` ✨
 
-### **`🌸 Instalación por termux`**
 
 > *C*
 ```bash
