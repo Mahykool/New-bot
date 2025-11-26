@@ -4,7 +4,7 @@ import { requireRoowner } from '../lib/permissions-middleware.js'
 
 const resolveTarget = (m, text) => {
   if (m.mentionedJid && m.mentionedJid.length) return m.mentionedJid[0]
-  if (m.quoted && m.quoted.sender) return m.quoted.sender
+  if (m.quoted && (m.quoted.sender || m.quoted.key?.participant)) return m.quoted.sender || m.quoted.key?.participant
   if (text && text.trim()) {
     const t = text.trim().split(/\s+/)[0]
     return t.includes('@') ? t : `${t.replace(/\D/g, '')}@s.whatsapp.net`
@@ -14,8 +14,18 @@ const resolveTarget = (m, text) => {
 
 var handler = async (m, { conn, text, usedPrefix, command }) => {
   try {
-    requireRoowner(m)
-    const targetJid = resolveTarget(m, text)
+    // Verifica permisos; requireRoowner lanza si no tiene permiso
+    try {
+      requireRoowner(m)
+    } catch (err) {
+      return conn.reply(m.chat, '🚫 Solo el roowner puede usar este comando.', m)
+    }
+
+    // Resolver y normalizar target
+    const rawTarget = resolveTarget(m, text)
+    const toJid = typeof global.toJid === 'function' ? global.toJid : (j => String(j))
+    const targetJid = toJid(rawTarget)
+
     if (!targetJid) return conn.reply(m.chat, `Uso: ${usedPrefix}${command} 569XXXXXXXX o responde/menciona al usuario.`, m)
 
     const ok = await removeRole('mods', targetJid)
@@ -23,7 +33,6 @@ var handler = async (m, { conn, text, usedPrefix, command }) => {
 
     return conn.reply(m.chat, `✅ ${toNum(targetJid)} removido de moderadores.`, m)
   } catch (e) {
-    if (e && e.message === 'NO_ROOWNER') return conn.reply(m.chat, '🚫 Solo el roowner puede usar este comando.', m)
     console.error('remove-mod error', e)
     return conn.reply(m.chat, '❌ Error interno al intentar remover moderador.', m)
   }
