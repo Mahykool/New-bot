@@ -1,7 +1,7 @@
-// plugins/kick.js - Parche de normalización y comprobaciones
+// plugins/kick.js - Parche final con normalización y comprobaciones
 var handler = async (m, { conn, usedPrefix, command }) => {
-  // Helper: normalizar a JID completo
-  const toJid = (jidOrNum) => {
+  // Usa el helper global si existe, si no, define uno local
+  const toJid = typeof global.toJid === 'function' ? global.toJid : (jidOrNum) => {
     if (!jidOrNum) return null
     jidOrNum = String(jidOrNum)
     if (jidOrNum.endsWith('@s.whatsapp.net') || jidOrNum.endsWith('@g.us')) return jidOrNum
@@ -14,6 +14,15 @@ var handler = async (m, { conn, usedPrefix, command }) => {
   let user = mentionedJid || (m.quoted && (m.quoted.sender || m.quoted.key?.participant)) || null
   user = toJid(user)
 
+  // Intentar extraer número desde args si no hay mención ni citado
+  if (!user && m.text) {
+    const parts = m.text.trim().split(/\s+/)
+    if (parts.length > 1) {
+      const maybe = parts[1].replace(/\D/g, '')
+      if (maybe.length) user = toJid(maybe)
+    }
+  }
+
   if (!user) return conn.reply(m.chat, `⚠️ Debes *mencionar* o *responder* a un usuario para expulsarlo.`, m)
 
   try {
@@ -21,7 +30,7 @@ var handler = async (m, { conn, usedPrefix, command }) => {
     const groupInfo = await conn.groupMetadata(m.chat)
     const participants = Array.isArray(groupInfo?.participants) ? groupInfo.participants : []
     const ownerGroup = toJid(groupInfo?.owner) || toJid(String(m.chat).split`-`[0])
-    const ownerBot = toJid((global.owner && global.owner[0] && global.owner[0][0]) ? global.owner[0][0] : null)
+    const ownerBot = Array.isArray(global.owner) && global.owner[0] ? toJid(global.owner[0][0]) : null
 
     // Verificar si el usuario objetivo es admin (considera varios formatos)
     const isAdminTarget = participants.some(p => {
@@ -30,24 +39,28 @@ var handler = async (m, { conn, usedPrefix, command }) => {
       return toJid(pid) === user && (adminFlag === 'admin' || adminFlag === 'superadmin' || adminFlag === true)
     })
 
-    // Normalizar sender y comparar con roles guardados (asumimos global.mods con JIDs completos)
+    // Normalizar sender y comparar con roles guardados (usar arrays JID completos)
     const senderJid = toJid(m.sender)
+    const roownerJids = Array.isArray(global.roownerJids) ? global.roownerJids : (Array.isArray(global.roowner) ? global.roowner.map(n => `${n}@s.whatsapp.net`) : [])
+    const ownerJids = Array.isArray(global.ownerJids) ? global.ownerJids : (Array.isArray(global.owner) ? global.owner.map(o => `${o[0]}@s.whatsapp.net`) : [])
+    const mods = Array.isArray(global.mods) ? global.mods : []
+
     const isModSender =
-      (Array.isArray(global.roowner) && global.roowner.includes((senderJid || '').replace('@s.whatsapp.net', ''))) ||
-      (Array.isArray(global.owner) && global.owner.some(o => toJid(o[0]) === senderJid)) ||
-      (Array.isArray(global.mods) && global.mods.includes(senderJid))
+      roownerJids.includes(senderJid) ||
+      ownerJids.includes(senderJid) ||
+      mods.includes(senderJid)
 
     if (!isModSender) return conn.reply(m.chat, `🚫 No tienes permisos para usar *${usedPrefix}${command}*.`, m)
 
     // Protecciones básicas
-    if (user === conn.user?.id || user === conn.user?.jid) return conn.reply(m.chat, `🤖 No puedo eliminar al *bot* del grupo.`, m)
+    const botJid = toJid(conn.user?.id || conn.user?.jid)
+    if (user === botJid) return conn.reply(m.chat, `🤖 No puedo eliminar al *bot* del grupo.`, m)
     if (user === ownerGroup) return conn.reply(m.chat, `👑 No puedo eliminar al *propietario del grupo*.`, m)
     if (ownerBot && user === ownerBot) return conn.reply(m.chat, `🛡️ No puedo eliminar al *propietario del bot*.`, m)
     if (isAdminTarget) return conn.reply(m.chat, `⚔️ No puedes eliminar a un *admin* del grupo.`, m)
 
     // Verificar que el bot sea admin
-    const botJid = conn.user?.id || conn.user?.jid
-    const botParticipant = participants.find(p => toJid(p.id || p.jid || p.participant) === toJid(botJid))
+    const botParticipant = participants.find(p => toJid(p.id || p.jid || p.participant) === botJid)
     const botIsAdmin = botParticipant && (botParticipant.admin === 'admin' || botParticipant.admin === 'superadmin' || botParticipant.admin === true)
     if (!botIsAdmin) return conn.reply(m.chat, '❌ Necesito ser admin para expulsar usuarios.', m)
 
