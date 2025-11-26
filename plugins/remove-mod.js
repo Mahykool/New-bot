@@ -1,43 +1,54 @@
-// plugins/remove-mod.js
-import { removeRole, toNum } from '../lib/lib-roles.js'
-import { requireRoowner } from '../lib/permissions-middleware.js'
+// plugins/list-mods.js
+import { listRole, toNum } from '../lib/lib-roles.js'
+import { hasPermission } from '../lib/permissions-middleware.js'
 
-const resolveTarget = (m, text) => {
-  if (m.mentionedJid?.length) return m.mentionedJid[0]
-  if (m.quoted?.sender) return m.quoted.sender
-  if (text?.trim()) {
-    const t = text.trim().split(/\s+/)[0]
-    return t.includes('@') ? t : `${t.replace(/\D/g, '')}@s.whatsapp.net`
-  }
-  return null
-}
-
-var handler = async (m, { conn, text, usedPrefix, command }) => {
+var handler = async (m, { conn }) => {
   try {
-    requireRoowner(m)
+    const sender = m.sender
 
-    const targetJid = resolveTarget(m, text)
-    if (!targetJid)
-      return conn.reply(m.chat, `Uso: ${usedPrefix}${command} 569XXXXXXXX o responde/menciona al usuario.`, m)
+    // ✅ Permitir acceso a:
+    // - roowner
+    // - owners
+    // - mods
+    // - usuarios con permiso "gestionar_roles"
 
-    const ok = await removeRole('mods', targetJid)
-    if (!ok)
-      return conn.reply(m.chat, `ℹ️ ${toNum(targetJid)} no es moderador o ocurrió un error.`, m)
+    const isRowner = global.roowner?.includes(sender)
+    const isOwner = global.owner?.some(o => o[0] === sender)
+    const isMod = global.mods?.includes(sender)
+    const hasManagePerm = hasPermission(sender, 'gestionar_roles')
 
-    return conn.reply(m.chat, `✅ ${toNum(targetJid)} removido de moderadores.`, m)
+    if (!isRowner && !isOwner && !isMod && !hasManagePerm) {
+      return conn.reply(
+        m.chat,
+        '🚫 No tienes permisos para ver la lista de moderadores.',
+        m
+      )
+    }
+
+    // ✅ Obtener lista real de mods
+    const arr = listRole('mods') || []
+    if (!arr.length)
+      return conn.reply(m.chat, 'ℹ️ No hay moderadores registrados.', m)
+
+    const lines = arr.map((x, i) => {
+      const jid = Array.isArray(x) ? x[0] : x
+      return `${i + 1}. ${toNum(jid)}`
+    })
+
+    return conn.reply(
+      m.chat,
+      `📋 *Moderadores registrados:*\n\n${lines.join('\n')}`,
+      m
+    )
 
   } catch (e) {
-    if (e.message === 'NO_ROOWNER')
-      return conn.reply(m.chat, '🚫 Solo el roowner puede usar este comando.', m)
-
-    console.error('remove-mod error', e)
-    return conn.reply(m.chat, '❌ Error interno al intentar remover moderador.', m)
+    console.error('list-mods error', e)
+    return conn.reply(m.chat, '❌ Error al listar moderadores.', m)
   }
 }
 
-handler.help = ['removemod 569XXXXXXXX']
+handler.help = ['mods', 'listmods']
 handler.tags = ['admin']
-handler.command = /^(removemod|demote|quitarmod|mod\-)$/i
-handler.rowner = true
+handler.command = /^(mods|listmods|list-mods)$/i
 
 export default handler
