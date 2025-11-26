@@ -1,6 +1,8 @@
 # `👑 SWILL - V1` ✨
 
-> *C*
+### **`🌸 Instalación por termux`**
+
+> *Comandos para instalar de forma manual*
 ```bash
 termux-setup-storage
 ```
@@ -8,12 +10,11 @@ termux-setup-storage
 apt update && apt upgrade && pkg install -y git nodejs ffmpeg imagemagick yarn
 ```
 ```bash
-git clone https://github.com/Mahykool/Swill-bot.git && cd Swill-bot```
+git clone https://github.com/leoxito/Itsuki-NakanoV2 && cd Itsuki-NakanoV2
+```
 ```bash
 npm install
 ```
 ```bash
 npm start
 ```
-
-
