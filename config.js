@@ -24,9 +24,18 @@ global.owner = [
 ]
 
 // Moderadores (admin virtuales: pueden banear/kickear)
-global.mods = [
-  '56961199174@s.whatsapp.net'
-]
+import path from 'path'
+
+const modsPath = path.join(process.cwd(), 'src', 'database', 'mods.json')
+const normalize = n => String(n || '').replace(/@s\.whatsapp\.net/g, '') + '@s.whatsapp.net'
+
+try {
+  const raw = require(modsPath)
+  global.mods = Array.isArray(raw) ? raw.map(normalize) : []
+} catch (e) {
+  global.mods = []
+}
+
 
 // Suittag y prems (privilegios secundarios)
 global.suittag = [
