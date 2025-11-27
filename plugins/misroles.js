@@ -27,7 +27,7 @@ var handler = async (m, { conn }) => {
 }
 
 handler.help = ['misroles']
-handler.tags = ['info']
+handler.tags = ['roles']
 handler.command = /^misroles$/i
 
 export default handler
