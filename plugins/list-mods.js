@@ -24,6 +24,6 @@ handler.help = ['mods', 'listmods']
 handler.tags = ['admin']
 // Opciones de restricción: elige la que quieras
 handler.owner = true         // solo owner (actual)
- // handler.rowner = true    // solo roowner (descomenta si prefieres)
+handler.rowner = true    // solo roowner (descomenta si prefieres)
  // handler.group = false    // si quieres restringir a grupos
 export default handler
