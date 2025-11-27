@@ -101,7 +101,7 @@ ${modList}
 }
 
 handler.help = ['modmenu']
-handler.tags = ['staff']
+handler.tags = ['admin']
 handler.command = /^modmenu$/i
 
 export default handler
