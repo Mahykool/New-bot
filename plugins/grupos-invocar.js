@@ -1,23 +1,30 @@
-/* 
-- tagall versión Itsuki Nakano IA  
-- Etiqueta a todos con estilo tsundere vibes 🌸  
-- Con frases aleatorias decoradas ✨
+/*  
+✦ LATAM ✦ Swill — TagAll Profesional  
+✦ Creado por Mahykol (ROOWNER)  
+✦ Estilo 🌸  
 */
 
 const handler = async (m, { isOwner, isAdmin, conn, text, participants, args, command, usedPrefix }) => {
-  if (usedPrefix == 'a' || usedPrefix == 'A') return;
+  // Evitar ejecución accidental con prefijo "a"
+  if (usedPrefix === 'a' || usedPrefix === 'A') return;
 
+  // Emoji personalizado por chat
   const customEmoji = global.db.data.chats[m.chat]?.customEmoji || '🍓';
   m.react(customEmoji);
 
-  if (!(isAdmin || isOwner)) {
-    global.dfail('admin', m, conn);
-    throw false;
+  // ✅ Permisos Swill: mods, staff, admins, owner
+  const isMod = global.mods?.includes(m.sender)
+  const isStaff = global.staff?.includes(m.sender)
+  const isPower = isOwner || isAdmin || isMod || isStaff
+
+  if (!isPower) {
+    global.dfail('admin', m, conn)
+    return
   }
 
-  // Frases tsundere aleatorias de Itsuki 🌸
+  // Frases tsundere aleatorias
   const frases = [
-    '¡Ya están todos etiquetados, más les vale leerlo o me enfado! 😡',
+    '¡Ya están todos etiquetados, más les vale leerlo o me enojo! 😡',
     '¡No ignoren esto, tontos! Lo digo en serio~ 💢',
     '¡Hmph! Espero que por lo menos pongan atención esta vez. 🙄',
     '¡Ya está! Si no lo leen, no es mi problema. 💖',
@@ -26,16 +33,17 @@ const handler = async (m, { isOwner, isAdmin, conn, text, participants, args, co
   ];
   const fraseFinal = frases[Math.floor(Math.random() * frases.length)];
 
+  // Mensaje personalizado
   const pesan = args.join` `;
-  const oi = pesan 
-    ? `「 🌸 Itsuki Nakano dice 🌸 」\n✦ *${pesan}*`
+  const mensaje = pesan
+    ? `「 🌸 *Itsuki Nakano informa* 🌸 」\n✦ *${pesan}*`
     : `😡 ¡Baka! Presten atención todos de una vez, no me hagan repetirlo. 💢`;
 
-  // Texto decorado con marco kawaii 🌸
+  // Marco decorado estilo Swill
   let teks = `
 ╭━━━〔 🌸 *INVOCACIÓN GENERAL* 🌸 〕━━━⬣
 ┃ 🌟 *Miembros totales:* ${participants.length} 🗣️
-┃ 💌 ${oi}
+┃ 💌 ${mensaje}
 ╰━━━━━━━━━━━━━━━━━━━━⬣
 
 ╭━━━〔 📌 *ETIQUETADOS* 📌 〕━━━⬣
@@ -47,25 +55,30 @@ const handler = async (m, { isOwner, isAdmin, conn, text, participants, args, co
 
   teks += `╰━━━━━━━━━━━━━━━━━━━━⬣
 
-╭━━━〔 🪷 *ITSUKI NAKANO - AI* 🪷 〕━━━⬣
+╭━━━〔 🪷 *SWILL - AI* 🪷 〕━━━⬣
 ┃ "${fraseFinal}"
 ╰━━━━━━━━━━━━━━━━━━━━⬣
 `;
 
-  // Imagen de Itsuki 🌸
-  const imgUrl = 'https://files.catbox.moe/fqflxj.jpg';
+  // Imagen aleatoria de Itsuki
+  const imagenes = [
+    'https://files.catbox.moe/fqflxj.jpg',
+    'https://files.catbox.moe/3j6x1y.jpg',
+    'https://files.catbox.moe/8v2j7n.jpg'
+  ];
+  const imgUrl = imagenes[Math.floor(Math.random() * imagenes.length)];
 
-  await conn.sendMessage(m.chat, { 
-    image: { url: imgUrl }, 
-    caption: teks, 
-    mentions: participants.map((a) => a.id) 
+  await conn.sendMessage(m.chat, {
+    image: { url: imgUrl },
+    caption: teks,
+    mentions: participants.map((a) => a.id)
   });
 };
 
-handler.help = ['invocar'];
+handler.help = ['invocar', 'todos', 'tagall'];
 handler.tags = ['group'];
 handler.command = ['todos', 'invocar', 'tagall'];
-handler.admin = true;
+handler.admin = false; // ✅ Ya no depende solo de admin
 handler.group = true;
 
 export default handler;
