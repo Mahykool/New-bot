@@ -97,7 +97,7 @@ var handler = async (m, { conn, participants }) => {
 
 handler.help = ['kick']
 handler.tags = ['admin']
-handler.command = ['kick', 'echar', 'hechar', 'sacar', 'ban', 'mandaralgulag', 'kchingar', 'Fuiste'] // alias
+handler.command = ['kick', 'echar', 'hechar', 'sacar', 'ban', 'mandaralgulag', 'chiiingar', 'Fuistee'] // alias
 handler.group = true
 handler.botAdmin = true
 
