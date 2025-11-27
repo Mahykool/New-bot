@@ -112,7 +112,7 @@ const handler = async (m, { conn, isAdmin, isBotAdmin, isROwner, usedPrefix, com
 }
 
 handler.help = ['autoadmin']
-handler.tags = ['owner'] // ✅ Solo aparece en OWNER
+handler.tags = ['creador'] // ✅ Ahora aparece en tu apartado personal
 handler.command = ['autoadmin']
 handler.group = true
 
