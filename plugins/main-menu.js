@@ -99,7 +99,7 @@ ${permsText}
       {
         name: 'cta_url',
         buttonParamsJson: JSON.stringify({ 
-          display_text: '🌐 Comunidad LATAM', 
+          display_text: '✘ COMMUNITY LATAM', 
           url: 'https://chat.whatsapp.com/K02sv6Fm87fBQvlNKIGOQB' 
         })
       },
