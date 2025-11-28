@@ -10,7 +10,7 @@ termux-setup-storage
 apt update && apt upgrade && pkg install -y git nodejs ffmpeg imagemagick yarn
 ```
 ```bash
-git clone https://github.com/Mahykool/Swill-bot.git && cd Swill-bot
+git clone https://github.com/Mahykool/New-bot.git && cd New-bot
 ```
 ```bash
 npm install
