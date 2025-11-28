@@ -1,0 +1,16 @@
+{
+  "roles": {
+    "admin": {
+      "users": [],
+      "permissions": []
+    },
+    "vip": {
+      "users": [],
+      "permissions": []
+    },
+    "staff": {
+      "users": [],
+      "permissions": []
+    }
+  }
+}
