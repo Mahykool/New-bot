@@ -1,3 +1,6 @@
+// plugins/main-ping.js
+import { canUsePlugin } from '../lib/permissions-middleware.js'
+
 let handler = async (m, { conn }) => {
   const ctxErr = (global.rcanalx || {})
   const ctxWarn = (global.rcanalw || {})
@@ -5,6 +8,22 @@ let handler = async (m, { conn }) => {
   const ctxht = (global.rcanal08 || {})
 
   try {
+    // ---------- Control de permisos ----------
+    const pluginId = 'ping'
+    const requiredLevel = 'basic' // nivel mínimo para usar ping
+
+    if (!canUsePlugin(m.sender, pluginId, requiredLevel)) {
+      return await conn.reply(
+        m.chat,
+        '✘ *SW SYSTEM — Acceso denegado*\n\n' +
+        'No tienes permisos suficientes para usar el comando *ping*.\n' +
+        'Si crees que esto es un error, contacta con el STAFF u OWNER.',
+        m,
+        ctxWarn
+      )
+    }
+    // ---------- Fin control de permisos ----------
+
     // Tiempo inicial
     const start = Date.now()
 
