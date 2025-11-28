@@ -1,7 +1,6 @@
 # `👑 SWILL - V1` ✨
 
-//<details>
-//<summary><b>📌 OFUKNA</b></summary>
+<summary><b>📌 OFUKNA</b></summary>
 ```bash
 termux-setup-storage
 ```
