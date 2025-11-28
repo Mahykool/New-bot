@@ -1,4 +1,4 @@
-// Menú Oficial Versión V2 PremBot 🌸‼️
+// Menú Oficial Versión V2 Swill t 🌸‼️
 
 import { existsSync } from 'fs'
 import { join } from 'path'
@@ -52,36 +52,15 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
 
     const localImagePath = join(process.cwd(), 'src', 'menu.jpg')
 
-    const nativeButtons = [
-      {
-        name: 'cta_url',
-        buttonParamsJson: JSON.stringify({ 
-          display_text: '☃️ ᴄᴀɴᴀʟ ᴏғɪᴄɪᴀʟ', 
-          url: 'https://whatsapp.com/channel/0029VbBvZH5LNSa4ovSSbQ2N' 
-        })
-      },
-      {
-        name: 'cta_url',
-        buttonParamsJson: JSON.stringify({ 
-          display_text: '🌨️ ᴄᴏᴍᴜɴɪᴅᴀᴅ ᴏғɪᴄɪᴀʟ', 
-          url: 'https://chat.whatsapp.com/BXxWuamOOE4K9eKC623FIO' 
-        })
-      },
-      {
-        name: 'cta_url',
-        buttonParamsJson: JSON.stringify({ 
-          display_text: '💻 ʜᴏsᴛɪɴɢ-ᴏғɪᴄɪᴀʟ', 
-          url: 'https://dash.quintillisas.com' 
-        })
-      },
-      {
-        name: 'cta_url',
-        buttonParamsJson: JSON.stringify({ 
-          display_text: '📲 ᴡᴇʙ ᴏғɪᴄɪᴀʟ-ʙᴏᴛ', 
-          url: 'https://web.quintillisas.com' 
-        })
-      }
-    ]
+   const nativeButtons = [
+  {
+    name: 'cta_url',
+    buttonParamsJson: JSON.stringify({ 
+      display_text: '✨ Comunidad 🥵', 
+      url: 'https://chat.whatsapp.com/K02sv6Fm87fBQvlNKIGOQB' 
+    })
+  }
+]
 
     let header
     if (existsSync(localImagePath)) {
