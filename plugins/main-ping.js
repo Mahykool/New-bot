@@ -1,5 +1,5 @@
 // plugins/main-ping.js
-import { canUsePlugin } from '../lib/permissions-middleware.js'
+import { getUserRoles } from '../lib/lib-roles.js'
 
 let handler = async (m, { conn }) => {
   const ctxErr = (global.rcanalx || {})
@@ -8,21 +8,27 @@ let handler = async (m, { conn }) => {
   const ctxht = (global.rcanal08 || {})
 
   try {
-    // ---------- Control de permisos ----------
-    const pluginId = 'ping'
-    const requiredLevel = 'basic' // nivel mínimo para usar ping
+    // ---------- Control de acceso: solo staff (mod), owner y roowner ----------
+    const userJid = m.sender
+    const roles = getUserRoles(userJid) || []
 
-    if (!canUsePlugin(m.sender, pluginId, requiredLevel)) {
+    // roowner en config.js (fallback) — si lo tienes definido en config.js
+    const isRoOwner = Array.isArray(global.roowner) && global.roowner.includes(userJid)
+
+    const isOwner = roles.includes('owner') || isRoOwner
+    const isStaff = roles.includes('staff') // 'staff' es el id unificado para mod
+
+    if (!(isOwner || isStaff)) {
       return await conn.reply(
         m.chat,
         '✘ *SW SYSTEM — Acceso denegado*\n\n' +
-        'No tienes permisos suficientes para usar el comando *ping*.\n' +
-        'Si crees que esto es un error, contacta con el STAFF u OWNER.',
+        'Este comando solo está disponible para STAFF (mod) y OWNER.\n' +
+        'Si crees que deberías tener acceso, contacta con el OWNER.',
         m,
         ctxWarn
       )
     }
-    // ---------- Fin control de permisos ----------
+    // ---------- Fin control de acceso ----------
 
     // Tiempo inicial
     const start = Date.now()
