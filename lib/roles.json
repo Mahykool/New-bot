@@ -3,53 +3,28 @@
     "name": "OWNER",
     "icon": "👑",
     "description": "Control absoluto del sistema",
-    "globalPermissions": [
-      "MANAGE_ROLES",
-      "USE_ALL_PLUGINS"
-    ],
-    "pluginPermissions": {
-      "ping": "basic",
-      "welcome": "manage",
-      "antilink": "manage",
-      "main-menu": "basic"
-    }
+    "globalPermissions": ["MANAGE_ROLES","USE_ALL_PLUGINS"],
+    "pluginPermissions": {"ping":"basic","welcome":"manage","antilink":"manage","main-menu":"basic"}
   },
   "staff": {
     "name": "STAFF",
     "icon": "🛡",
     "description": "Soporte y moderación",
-    "globalPermissions": [
-      "MODERATE_GROUPS"
-    ],
-    "pluginPermissions": {
-      "ping": "basic",
-      "welcome": "manage",
-      "antilink": "manage",
-      "main-menu": "basic"
-    }
+    "globalPermissions": ["MODERATE_GROUPS"],
+    "pluginPermissions": {"ping":"basic","welcome":"manage","antilink":"manage","main-menu":"basic"}
   },
   "premium": {
     "name": "PREMIUM",
     "icon": "💠",
     "description": "Usuario con beneficios extendidos",
     "globalPermissions": [],
-    "pluginPermissions": {
-      "ping": "basic",
-      "welcome": "basic",
-      "antilink": "none",
-      "main-menu": "basic"
-    }
+    "pluginPermissions": {"ping":"basic","welcome":"basic","antilink":"none","main-menu":"basic"}
   },
   "user": {
     "name": "USER",
     "icon": "🔹",
     "description": "Usuario estándar del sistema",
     "globalPermissions": [],
-    "pluginPermissions": {
-      "ping": "basic",
-      "welcome": "basic",
-      "antilink": "none",
-      "main-menu": "basic"
-    }
+    "pluginPermissions": {"ping":"basic","welcome":"basic","antilink":"none","main-menu":"basic"}
   }
 }
