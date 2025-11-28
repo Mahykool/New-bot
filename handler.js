@@ -6,6 +6,9 @@ import { unwatchFile, watchFile } from 'fs'
 import chalk from 'chalk'
 import fetch from 'node-fetch'
 
+import { canUsePlugin } from './lib/permissions-middleware.js'
+import { getUserRoles } from './lib/lib-roles.js'
+
 if (typeof global.__filename !== 'function') global.__filename = u => fileURLToPath(u)
 if (typeof global.__dirname !== 'function') global.__dirname = u => path.dirname(fileURLToPath(u))
 
@@ -626,23 +629,56 @@ export async function handler(chatUpdate) {
           if (name != 'owner-unbanuser.js' && user?.banned) return
           if (name != 'owner-unbanbot.js' && setting?.banned) return
         }
-        if (plugin.rowner && !rolesCtx.isROwner) { fail('rowner', m, this); continue }
-        if (plugin.owner && !(rolesCtx.isOwner || rolesCtx.isROwner)) { fail('owner', m, this); continue }
-        if (plugin.mods) { fail('mods', m, this); continue }
-        if (plugin.premium && !rolesCtx.isPrems) { fail('premium', m, this); continue }
-        if (plugin.group && !m.isGroup) { fail('group', m, this); continue }
-        else if (plugin.botAdmin && !isBotAdmin) { fail('botAdmin', m, this); continue }
-        else if (plugin.admin && !isAdmin) { fail('admin', m, this); continue }
-        if (plugin.private && m.isGroup) { fail('private', m, this); continue }
-        if (plugin.register == true && _user.registered == false) { fail('unreg', m, this); continue }
-        m.isCommand = true
-        let xp = 'exp' in plugin ? parseInt(plugin.exp) : 17
-        if (xp > 200) m.reply('chirrido -_-')
-        else m.exp += xp
-        if (plugin.limit && global.db.data.users[m.sender].limit < plugin.limit * 1) { this.reply(m.chat, `Se agotaron tus *Dolares 💲*`, m); continue }
-        let extra = { match, usedPrefix, noPrefix, _args, args, command, text, conn: this, participants, groupMetadata, user: participantUser || {}, bot: botParticipant || {}, isROwner: rolesCtx.isROwner, isOwner: rolesCtx.isOwner, isRAdmin, isAdmin, isBotAdmin, isPrems: rolesCtx.isPrems, chatUpdate, __dirname: ___dirname, __filename, displayTag: m.displayTag, badges: m.badges, role: m.role, parseUserTargets, getUserInfo }
-        let didPresence = false
-        try {
+if (plugin.rowner && !rolesCtx.isROwner) { fail('rowner', m, this); continue }
+if (plugin.owner && !(rolesCtx.isOwner || rolesCtx.isROwner)) { fail('owner', m, this); continue }
+
+// Compatibilidad: plugin.mods ahora verifica roles 'staff' u 'owner' en user-roles.json
+if (plugin.mods) {
+  try {
+    const roles = getUserRoles(m.sender) || []
+    const isStaff = roles.includes('staff')
+    const isOwner = roles.includes('owner') || (Array.isArray(global.roowner) && global.roowner.includes(m.sender))
+    if (!isStaff && !isOwner) { fail('mods', m, this); continue }
+  } catch (e) {
+    console.error('Error comprobando plugin.mods:', e)
+    fail('mods', m, this); continue
+  }
+}
+
+if (plugin.premium && !rolesCtx.isPrems) { fail('premium', m, this); continue }
+if (plugin.group && !m.isGroup) { fail('group', m, this); continue }
+else if (plugin.botAdmin && !isBotAdmin) { fail('botAdmin', m, this); continue }
+else if (plugin.admin && !isAdmin) { fail('admin', m, this); continue }
+if (plugin.private && m.isGroup) { fail('private', m, this); continue }
+if (plugin.register == true && _user.registered == false) { fail('unreg', m, this); continue }
+
+m.isCommand = true
+let xp = 'exp' in plugin ? parseInt(plugin.exp) : 17
+if (xp > 200) m.reply('chirrido -_-')
+else m.exp += xp
+if (plugin.limit && global.db.data.users[m.sender].limit < plugin.limit * 1) { this.reply(m.chat, `Se agotaron tus *Dolares 💲*`, m); continue }
+
+let extra = { match, usedPrefix, noPrefix, _args, args, command, text, conn: this, participants, groupMetadata, user: participantUser || {}, bot: botParticipant || {}, isROwner: rolesCtx.isROwner, isOwner: rolesCtx.isOwner, isRAdmin, isAdmin, isBotAdmin, isPrems: rolesCtx.isPrems, chatUpdate, __dirname: ___dirname, __filename, displayTag: m.displayTag, badges: m.badges, role: m.role, parseUserTargets, getUserInfo }
+
+// Validación declarativa mínima (si el plugin declara pluginId/requiredLevel)
+try {
+  const pluginId = plugin.pluginId || (Array.isArray(plugin.command) ? (plugin.command[0] || '') : (typeof plugin.command === 'string' ? plugin.command : ''))
+  const requiredLevel = plugin.requiredLevel || null
+  if (pluginId && requiredLevel) {
+    if (!canUsePlugin(m.sender, pluginId, requiredLevel)) {
+      // Si no tienes dfail('access') definido, reemplaza la siguiente línea por this.reply(...)
+      try { fail('access', m, this) } catch { this.reply(m.chat, '✘ Acceso denegado: no tienes permisos para usar este comando.', m) }
+      continue
+    }
+  }
+} catch (err) {
+  console.error('Error validando permisos declarativos:', err)
+  try { fail('access', m, this) } catch { this.reply(m.chat, '✘ Acceso denegado', m) }
+  continue
+}
+
+let didPresence = false
+try {
           const botIdKey = this.user?.jid || (this.user?.id ? this.decodeJid(this.user.id) : 'bot')
           const autotypeEnabled = !!global.db?.data?.settings?.[botIdKey]?.autotypeDotOnly
           if (autotypeEnabled && usedPrefix === '.' && typeof this.sendPresenceUpdate === 'function') {
