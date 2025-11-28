@@ -29,10 +29,10 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
         SWILL MENU
 ==============================
 
-${role.icon || '🔹'} *${role.name}*
+${role.icon || '🔹'} ${role.name}
 ${role.description}
 
-🔐 *Permisos activos:*
+🔐 Permisos activos:
 ${permsText}
 
 `
