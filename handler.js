@@ -10,7 +10,7 @@ import { decodeJidCompat } from './lib/utils.js'
 if (typeof global.__filename !== 'function') global.__filename = u => fileURLToPath(u)
 if (typeof global.__dirname !== 'function') global.__dirname = u => path.dirname(fileURLToPath(u))
 
-const { proto } = (await import('@whiskeysockets/baileys')).default
+import { proto } from '@whiskeysockets/baileys'
 const isNumber = x => typeof x === 'number' && !isNaN(x)
 const delay = ms => isNumber(ms) && new Promise(resolve => setTimeout(function () { clearTimeout(this); resolve() }, ms))
 
