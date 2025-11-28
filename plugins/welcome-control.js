@@ -1,9 +1,8 @@
 // welcome-control.js
 /**
- * 🎀 CREADO POR: LeoXzzsy
- * 🌸 ADAPTADO PARA: Itsuki-Nakano IA
- * 📚 VERSIÓN: 3.4.0 Beta
- * 🏷️ SISTEMA DE CONTROL WELCOME
+ * ✦ SWILL SYSTEM — CONTROL DE WELCOME
+ * ✦ DESARROLLADO POR: Mahykol
+ * ✦ VERSIÓN: 3.8.0
  */
 
 let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
@@ -11,8 +10,11 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
   const ctxWarn = (global.rcanalw || {})
   const ctxOk = (global.rcanalr || {})
 
-  if (!m.isGroup) return conn.reply(m.chat, '❌ Este comando solo funciona en grupos', m, ctxErr)
-  if (!isAdmin) return conn.reply(m.chat, '❌ Solo los administradores pueden usar este comando', m, ctxErr)
+  if (!m.isGroup) 
+    return conn.reply(m.chat, '❌ Este comando solo funciona en grupos', m, ctxErr)
+
+  if (!isAdmin) 
+    return conn.reply(m.chat, '❌ Solo los administradores pueden usar este comando', m, ctxErr)
 
   const action = (m.text || '').toLowerCase().split(' ')[1]
   const jid = m.chat
@@ -23,52 +25,67 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
     
     if (action === 'on' || action === 'activar') {
       setWelcomeState(jid, true)
-      return conn.reply(m.chat, 
-        `✅ *Welcome activado*\n\n` +
-        `Ahora se enviarán mensajes de bienvenida y despedida en este grupo\n\n` +
-        `🎀 *Itsuki-Nakano IA v3.4.0 Beta*\n` +
-        `╰ Creado por: LeoXzzsy`, 
-      m, ctxOk)
+      return conn.reply(
+        m.chat,
+        `✅ *WELCOME ACTIVADO*\n\n` +
+        `Los mensajes de bienvenida y despedida están ahora activos en este grupo.\n\n` +
+        `✦ SWILL SYSTEM v3.8.0`,
+        m,
+        ctxOk
+      )
     } 
+    
     else if (action === 'off' || action === 'desactivar') {
       setWelcomeState(jid, false)
-      return conn.reply(m.chat, 
-        `❌ *Welcome desactivado*\n\n` +
-        `Ya no se enviarán mensajes de bienvenida y despedida en este grupo\n\n` +
-        `🎀 *Itsuki-Nakano IA v3.4.0 Beta*\n` +
-        `╰ Creado por: LeoXzzsy`, 
-      m, ctxErr)
+      return conn.reply(
+        m.chat,
+        `❌ *WELCOME DESACTIVADO*\n\n` +
+        `Los mensajes de bienvenida y despedida han sido desactivados.\n\n` +
+        `✦ SWILL SYSTEM v3.8.0`,
+        m,
+        ctxErr
+      )
     }
+
     else if (action === 'status' || action === 'estado') {
       const status = isWelcomeEnabled(jid) ? '🟢 ACTIVADO' : '🔴 DESACTIVADO'
-      return conn.reply(m.chat, 
-        `📊 *Estado del Welcome*\n\n` +
+      return conn.reply(
+        m.chat,
+        `📊 *ESTADO DEL WELCOME*\n\n` +
         `Estado actual: ${status}\n\n` +
-        `Usa:\n` +
-        `*${usedPrefix}welcome on* - Para activar\n` +
-        `*${usedPrefix}welcome off* - Para desactivar\n\n` +
-        `🎀 *Itsuki-Nakano IA v3.4.0 Beta*\n` +
-        `╰ Creado por: LeoXzzsy`, 
-      m, ctxWarn)
+        `Comandos:\n` +
+        `• ${usedPrefix}welcome on\n` +
+        `• ${usedPrefix}welcome off\n` +
+        `• ${usedPrefix}welcome status\n\n` +
+        `✦ SWILL SYSTEM v3.8.0`,
+        m,
+        ctxWarn
+      )
     }
+
     else {
-      return conn.reply(m.chat, 
-        `🏷 *Configuración del Welcome*\n\n` +
-        `Usa:\n` +
-        `*${usedPrefix}welcome on* - Activar welcome\n` +
-        `*${usedPrefix}welcome off* - Desactivar welcome\n` +
-        `*${usedPrefix}welcome status* - Ver estado actual\n\n` +
-        `🎀 *Itsuki-Nakano IA v3.4.0 Beta*\n` +
-        `╰ Creado por: LeoXzzsy`, 
-      m, ctxWarn)
+      return conn.reply(
+        m.chat,
+        `⚙️ *CONFIGURACIÓN DEL WELCOME*\n\n` +
+        `Comandos disponibles:\n` +
+        `• ${usedPrefix}welcome on — Activar welcome\n` +
+        `• ${usedPrefix}welcome off — Desactivar welcome\n` +
+        `• ${usedPrefix}welcome status — Ver estado\n\n` +
+        `✦ SWILL SYSTEM v3.8.0`,
+        m,
+        ctxWarn
+      )
     }
+
   } catch (importError) {
     console.error('Error importing from lib/welcome.js:', importError)
-    return conn.reply(m.chat, 
-      `❌ Error: No se pudo cargar el sistema de welcome\n\n` +
-      `🎀 *Itsuki-Nakano IA v3.4.0 Beta*\n` +
-      `╰ Creado por: LeoXzzsy`, 
-    m, ctxErr)
+    return conn.reply(
+      m.chat,
+      `❌ Error: No se pudo cargar el sistema de welcome.\n\n` +
+      `✦ SWILL SYSTEM v3.8.0`,
+      m,
+      ctxErr
+    )
   }
 }
 
