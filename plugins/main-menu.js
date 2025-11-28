@@ -5,9 +5,6 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import { prepareWAMessageMedia, generateWAMessageFromContent, proto } from '@whiskeysockets/baileys'
 
-import { getRoleInfo } from '../lib/lib-roles.js'
-import { hasPermission, listAllPermissions } from '../lib/permissions-middleware.js'
-
 let handler = async (m, { conn, usedPrefix: _p }) => {
   try {
     const user = m.sender
