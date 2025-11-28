@@ -22,21 +22,17 @@ const phoneUtil = (libPhoneNumber.PhoneNumberUtil || libPhoneNumber.default?.Pho
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Globals mínimos y seguros
 global.prefixes = Array.isArray(config.prefix) ? [...config.prefix] : []
 global.owner = Array.isArray(config.owner) ? config.owner : []
 global.opts = global.opts && typeof global.opts === 'object' ? global.opts : {}
 global.jadi = global.jadi || 'jadibts'
-
-// Inicializaciones mínimas para plugins
 global.roowner = Array.isArray(global.roowner) ? global.roowner : []
 global.mods = Array.isArray(global.mods) ? global.mods : []
 global.staff = Array.isArray(global.staff) ? global.staff : []
 global.chatDefaults = (global.chatDefaults && typeof global.chatDefaults === 'object') ? global.chatDefaults : {}
 
-if (!fs.existsSync("./tmp")) {
-  fs.mkdirSync("./tmp")
-}
+if (!fs.existsSync("./tmp")) fs.mkdirSync("./tmp")
+
 const CONFIG_PATH = path.join(__dirname, 'config.js')
 watchFile(CONFIG_PATH, async () => {
   try {
@@ -161,12 +157,27 @@ async function chooseMethod(authDir) {
   } while (!['1','2'].includes(ans))
   return ans === '1' ? 'qr' : 'code'
 }
-// ======= Reinicio seguro y utilidades =======
 let __restarting = false
 let __restartTimeout = null
 const RESTART_DEBOUNCE_MS = 5000
+let lastRestartAt = 0
+let restartAttempts = 0
+const MAX_RESTART_ATTEMPTS = 6
 
 async function safeRestart(reason = 'manual') {
+  const now = Date.now()
+  if (now - lastRestartAt < 5000) {
+    console.log('[Restart] Ignorando reinicio rápido:', reason)
+    return
+  }
+  lastRestartAt = now
+
+  if (restartAttempts >= MAX_RESTART_ATTEMPTS) {
+    console.error('[Restart] Límite de reinicios alcanzado. Salida forzada.')
+    process.exit(1)
+  }
+  restartAttempts++
+
   try {
     if (__restarting) {
       console.log('[Restart] Reinicio ya en curso, ignorando:', reason)
@@ -351,8 +362,7 @@ async function startBot() {
   }
 
   setTimeout(maybeStartPairingFlow, 2500)
-    // Manejo robusto de connection.update
-  sock.ev.on('connection.update', async (update) => {
+    sock.ev.on('connection.update', async (update) => {
     try {
       const logUpdate = { ...update }
       if (method === 'code' && logUpdate.qr) delete logUpdate.qr
@@ -366,9 +376,7 @@ async function startBot() {
       }
       if (connection === 'open') {
         console.log('✅ Bot conectado exitosamente')
-        if (typeof sendReconnectionMessage === 'function') {
-          try { await sendReconnectionMessage(sock) } catch (e) { console.error('[ConnUpdate] sendReconnectionMessage error:', e?.message || e) }
-        }
+        restartAttempts = 0
         try {
           sock.__sessionOpenAt = Date.now()
           const rawId = sock?.user?.id || ''
@@ -428,7 +436,6 @@ async function startBot() {
     }
   })
 
-  // Mensajes upsert con envoltorio seguro
   sock.ev.on('messages.upsert', async (chatUpdate) => {
     try {
       const since = sock.__sessionOpenAt || PROCESS_START_AT
@@ -477,7 +484,6 @@ async function startBot() {
     try { if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true }) } catch (e) { console.error('[AuthDir]', e.message) }
   }
 
-  // Eventos de grupos (welcome/bye)
   sock.ev.on('group-participants.update', async (ev) => {
     try {
       const { id, participants, action } = ev || {}
@@ -526,7 +532,6 @@ async function startBot() {
     } catch (e) { console.error('[WelcomeEvent]', e) }
   })
 
-  // Hot reload y utilidades
   const PLUGIN_DIR = path.join(__dirname, 'plugins')
   let __syntaxErrorFn = null
   try { const mod = await import('syntax-error'); __syntaxErrorFn = mod.default || mod } catch {}
@@ -585,4 +590,3 @@ async function startBot() {
 
 }
 startBot()
-  
