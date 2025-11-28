@@ -1,7 +1,7 @@
 # `👑 SWILL - V1` ✨
 
-
-> *C*
+//<details>
+//<summary><b>📌 OFUKNA</b></summary>
 ```bash
 termux-setup-storage
 ```
@@ -17,57 +17,60 @@ npm install
 ```bash
 npm start
 ```
-//<details>
-//<summary><b>📌 Preparación del sistema</b></summary>
 
-//```bash
-//termux-setup-storage
-//```
-//
-//```bash
-//apt update && apt upgrade -y
-//```
-//
-//```bash
-//pkg install -y git ffmpeg imagemagick openssl curl
-//```
-//
-//```bash
-//curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-//```
-//
+
+
+<details>
+<summary><b>📌 Preparación del sistema</b></summary>
+
+```bash
+termux-setup-storage
+```
+
+```bash
+apt update && apt upgrade -y
+```
+
+```bash
+pkg install -y git ffmpeg imagemagick openssl curl
+```
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+```
+
 //</details>
 
 
 
-//<details>
-//<summary><b>🔄 Cerrar y volver a abrir Termux</b></summary>
+<details>
+<summary><b>🔄 Cerrar y volver a abrir Termux</b></summary>
 
-//```bash
-//nvm install 20
-//```
-//
-//```bash
-//nvm use 20
-//```
-//
-//</details>
+```bash
+nvm install 20
+```
+
+```bash
+nvm use 20
+```
+
+</details>
 
 
 
-//<details>
-//<summary><b>🤖 Clonar e iniciar el bot</b></summary>
+<details>
+<summary><b>🤖 Clonar e iniciar el bot</b></summary>
 
-//```bash
-//git clone https://github.com/Mahykool/Swill-bot.git && cd Swill-bot
-//```
-//
-//```bash
-//npm install
-//```
-//
-//```bash
-//npm start
-//```
-//
+```bash
+git clone https://github.com/Mahykool/Swill-bot.git && cd Swill-bot
+```
+
+```bash
+npm install
+```
+
+```bash
+npm start
+```
+
 //</details>
