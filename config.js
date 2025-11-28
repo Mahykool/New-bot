@@ -6,9 +6,9 @@ import * as cheerio from 'cheerio'
 import fetch from 'node-fetch'
 import axios from 'axios'
 import moment from 'moment-timezone'
-import { dirname } from 'path'
+import { dirname } from 'path' 
 
-global.__dirname = (url) => dirname(fileURLToPath(url))
+global.__dirname = (url) => dirname(fileURLToPath(url));
 
 // ======================================================
 // ✦ SW SYSTEM — GTA SAN ANDREAS EDITION
@@ -20,44 +20,32 @@ global.roowner = ['56969066865@s.whatsapp.net']
 
 // Dueños y co-dueños
 global.owner = [
-  ['56969066865@s.whatsapp.net', 'Mahykol 👑 Creador', true],
-  ['569XXXXXXXX@s.whatsapp.net', 'Co-Dueño', true]
-]
+   ['56969066865@s.whatsapp.net', 'Mahykol 👑 Creador', true],
+   ['569XXXXXXXX@s.whatsapp.net', 'Co-Dueño', true],
+];
 
 // Moderadores
-global.mods = [
-  '569XXXXXXXX@s.whatsapp.net'
-]
+global.mods = ['569XXXXXXXX@s.whatsapp.net']
 
 // Suittag y prems
-global.suittag = [
-  '569XXXXXXXX@s.whatsapp.net'
-]
-global.prems = [
-  '569XXXXXXXX@s.whatsapp.net'
-]
+global.suittag = ['569XXXXXXXX@s.whatsapp.net']
+global.prems = ['569XXXXXXXX@s.whatsapp.net']
 
-// Número del bot
-global.botNumber = '56900000000'
-
-// ======================================================
-// ✦ INFORMACIÓN DEL BOT
-// ======================================================
+// Información del bot 
 global.libreria = 'Baileys'
 global.baileys = 'V 6.7.9'
 global.languaje = 'Español'
-global.vs = '1.0.0'
-global.vsJB = '1.0'
-
+global.vs = '4.3.1'
+global.vsJB = '5.0'
 global.nameqr = 'SwillQR'
 global.namebot = 'Swill-IA'
-global.sessions = 'Swill-sessions'
-global.jadi = 'jadibts'
-global.SwillJadibts = true
+global.sessions = "Sessions/Principal"
+global.jadi = "Sessions/SubBot"
+global.ItsukiJadibts = true
 global.Choso = true
-
-global.prefix = ['.', '!', '/', '#', '%']
+global.prefix = ['.', '!', '/' , '#', '%']
 global.apikey = 'SwillIA-Key'
+global.botNumber = '56900000000'
 
 // ======================================================
 // ✦ BRANDING — SW SYSTEM
@@ -73,17 +61,9 @@ global.etiqueta = '@Mahykol'
 global.gt = '© SW SYSTEM — The Best WhatsApp IA'
 global.me = 'SW SYSTEM — Update'
 global.listo = '*Aquí tienes*'
-
-// ======================================================
-// ✦ ECONOMÍA Y LÍMITES
-// ======================================================
 global.moneda = 'SwillCoins'
 global.multiplier = 69
 global.maxwarn = 3
-
-// ======================================================
-// ✦ LIBRERÍAS GLOBALES
-// ======================================================
 global.cheerio = cheerio
 global.fs = fs
 global.fetch = fetch
@@ -91,43 +71,31 @@ global.axios = axios
 global.moment = moment
 
 // ======================================================
-// ✦ ENLACES OFICIALES
+// ✦ ENLACES OFICIALES — SW SYSTEM
 // ======================================================
 global.comunidad1 = 'https://chat.whatsapp.com/K02sv6Fm87fBQvlNKIGOQB'
 global.gp1 = 'https://chat.whatsapp.com/C01CZDKL88uEFRZqlLxOdg?mode=wwt'
-global.comunidad2 = ''
-global.comunidad3 = ''
-global.gp2 = ''
-global.gp3 = ''
-global.channel = ''
-global.channel2 = ''
-global.md = ''
-global.correo = ''
 
-// ======================================================
-// ✦ APIs
-// ======================================================
+
+
+// Apis para las descargas y más
 global.APIs = {
   ryzen: 'https://api.ryzendesu.vip',
   xteam: 'https://api.xteam.xyz',
   lol: 'https://api.lolhuman.xyz',
   delirius: 'https://delirius-apiofc.vercel.app',
   siputzx: 'https://api.siputzx.my.id',
-  mayapi: 'https://mayapi.ooguy.com',
-  swillapi: ''
+  mayapi: 'https://mayapi.ooguy.com'
 }
 
 global.APIKeys = {
   'https://api.xteam.xyz': 'YOUR_XTEAM_KEY',
   'https://api.lolhuman.xyz': 'API_KEY',
   'https://api.betabotz.eu.org': 'API_KEY',
-  'https://mayapi.ooguy.com': 'may-f53d1d49',
-  'https://api.swill.com': ''
+  'https://mayapi.ooguy.com': 'may-f53d1d49'
 }
 
-// ======================================================
-// ✦ ENDPOINTS IA
-// ======================================================
+// Endpoints de IA
 global.SIPUTZX_AI = {
   base: global.APIs?.siputzx || 'https://api.siputzx.my.id',
   bardPath: '/api/ai/bard',
@@ -135,13 +103,10 @@ global.SIPUTZX_AI = {
   headers: { accept: '*/*' }
 }
 
-// ======================================================
-// ✦ CONFIGURACIÓN POR DEFECTO DE CHATS
-// ======================================================
 global.chatDefaults = {
   isBanned: false,
   sAutoresponder: '',
-  welcome: true,
+  welcome: false,
   autolevelup: false,
   autoAceptar: false,
   autosticker: false,
@@ -163,9 +128,6 @@ global.chatDefaults = {
   antitoxic: false
 }
 
-// ======================================================
-// ✦ WATCHER (AUTO-RELOAD)
-// ======================================================
 let file = fileURLToPath(import.meta.url)
 watchFile(file, () => {
   unwatchFile(file)
@@ -173,9 +135,7 @@ watchFile(file, () => {
   try { import(pathToFileURL(file).href + `?update=${Date.now()}`) } catch {}
 })
 
-// ======================================================
-// ✦ EXPORT FINAL
-// ======================================================
+// Configuraciones finales
 export default {
   prefix: global.prefix,
   owner: global.owner,
