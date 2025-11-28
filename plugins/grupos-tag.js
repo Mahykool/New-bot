@@ -1,5 +1,6 @@
 import { generateWAMessageFromContent } from '@whiskeysockets/baileys'
 import * as fs from 'fs'
+import { decodeJidCompat } from '../lib/utils.js'
 
 const handler = async (m, { conn, text, participants, isOwner, isAdmin }) => {
   try {
@@ -13,7 +14,7 @@ const handler = async (m, { conn, text, participants, isOwner, isAdmin }) => {
       return
     }
 
-    const users = participants.map((u) => conn.decodeJid(u.id))
+    const users = participants.map((u) => (typeof conn.decodeJid === 'function' ? conn.decodeJid(u.id) : decodeJidCompat(u.id)))
     const q = m.quoted ? m.quoted : m || m.text || m.sender
     const c = m.quoted ? await m.getQuotedObj() : m.msg || m.text || m.sender
 
@@ -37,7 +38,7 @@ const handler = async (m, { conn, text, participants, isOwner, isAdmin }) => {
 
   } catch {
     // ✅ Fallback si falla el reenvío avanzado
-    const users = participants.map((u) => conn.decodeJid(u.id))
+    const users = participants.map((u) => (typeof conn.decodeJid === 'function' ? conn.decodeJid(u.id) : decodeJidCompat(u.id)))
     const quoted = m.quoted ? m.quoted : m
     const mime = (quoted.msg || quoted).mimetype || ''
     const isMedia = /image|video|sticker|audio/.test(mime)
