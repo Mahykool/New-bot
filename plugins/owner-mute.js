@@ -8,19 +8,20 @@ const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'shadowbans.json')
 
 const TITLE = 'ㅤׄㅤׅㅤׄ _*SHADOWBAN*_ ㅤ֢ㅤׄㅤׅ'
-const DEFAULT_GTA_THUMB = process.env.GTA_THUMB_1 || 'https://i.imgur.com/ejemploGTA1.jpg'
+function formatTitle() { return `${TITLE}\n` }
 
 function ensureDataDir() {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }) } catch {}
 }
 
+/* ---------- persistencia shadowbans ---------- */
 let shadowMap = new Map()
 
 function loadShadowbansFromDisk() {
   try {
     if (!fs.existsSync(FILE)) return
-    const raw = fs.readFileSync(FILE, 'utf8')
-    const arr = JSON.parse(raw || '[]')
+    const raw = fs.readFileSync(FILE, 'utf8') || '[]'
+    const arr = JSON.parse(raw)
     if (!Array.isArray(arr)) return
     const now = Date.now()
     for (const item of arr) {
@@ -56,47 +57,36 @@ function saveShadowbansToDisk() {
   }
 }
 
-function formatTitle() {
-  return `${TITLE}\n`
-}
-
+/* ---------- mensajes ---------- */
 function msgCreatorAttemptPublic() {
   return `${formatTitle()}*En serio intentaste shadowbanear al creador?* 💀\n\nNo lo intentes de nuevo.`
 }
-
 function msgCreatorPunishPublic(punisherShort) {
   return `${formatTitle()}✅ CASTIGO APLICADO\n\nHas sido shadowbaneado por intentar shadowbanear al creador.\nDuración: *5 minutos* — *INMUTABLE*\nResponsable: @${punisherShort}`
 }
-
 function msgCreatorPunishDM() {
   return `${formatTitle()}ATENCIÓN\n\nHas sido automáticamente shadowbaneado por intentar shadowbanear al creador.\nDuración: 5 minutos (INMUTABLE).`
 }
-
 function msgModProtected() {
   return `${formatTitle()}❌ No puedes shadowbanear a un moderador.\n\nSi crees que hay un problema, contacta con el creador.`
 }
-
 function msgShadowbanTemp(minutes, targetShort) {
   return `${formatTitle()}✨ SHADOWBAN TEMPORAL\n\nUsuario: @${targetShort}\nDuración: ${minutes} minuto(s)\n\nTe avisaré cuando termine.`
 }
-
 function msgShadowbanPerm(targetShort) {
   return `${formatTitle()}🔒 SHADOWBAN PERMANENTE\n\nUsuario: @${targetShort}\nHasta que se ejecute unshadowban.`
 }
-
 function msgShadowbanExpired(targetShort) {
   return `${formatTitle()}🎉 SHADOWBAN TERMINADO\n\nEl shadowban temporal de @${targetShort} ha finalizado.`
 }
-
 function msgUsage() {
   return `${formatTitle()}USO\n\n1) Shadowban indefinido — Responde y escribe: *shadowban*\n2) Shadowban temporal — Responde y escribe: *shadowban <minutos>* (ej. *shadowban 30*)\n\nComandos: unshadowban, mute, unmute`
 }
 
+/* ---------- scheduling ---------- */
 function scheduleUnshadow(jid, ms, conn = null) {
   const entry = shadowMap.get(jid)
-  if (entry && entry.timeoutId) {
-    clearTimeout(entry.timeoutId)
-  }
+  if (entry && entry.timeoutId) clearTimeout(entry.timeoutId)
   if (!ms || ms <= 0) return
   const timeoutId = setTimeout(async () => {
     try {
@@ -110,7 +100,7 @@ function scheduleUnshadow(jid, ms, conn = null) {
         try {
           await connToUse.sendMessage(chatId, { text: msgShadowbanExpired(jid.split('@')[0]) }, { mentions: [jid] })
         } catch (e) {
-          console.warn('scheduleUnshadow: fallo al notificar finalización', e)
+          console.warn('scheduleUnshadow notify error', e)
         }
       }
     } catch (e) {
@@ -127,17 +117,22 @@ function scheduleAllTimeouts() {
   for (const [jid, v] of shadowMap.entries()) {
     if (v.expiresAt) {
       const ms = v.expiresAt - now
-      if (ms <= 0) {
-        shadowMap.delete(jid)
-      } else {
-        scheduleUnshadow(jid, ms, null)
-      }
+      if (ms <= 0) shadowMap.delete(jid)
+      else scheduleUnshadow(jid, ms, null)
     }
   }
   saveShadowbansToDisk()
 }
 
-loadShadowbansFromDisk()
+/* ---------- helpers roles ---------- */
+function hasRoleLocal(jid, role) {
+  try {
+    const roles = getUserRoles(jid) || []
+    return roles.map(r => String(r).toLowerCase()).includes(String(role).toLowerCase())
+  } catch (e) {
+    return false
+  }
+}
 
 /* ---------- extracción robusta del target ---------- */
 function extractTargetJid(m) {
@@ -153,24 +148,24 @@ function extractTargetJid(m) {
         null
       if (candidate) return normalizeJid(candidate)
     }
-
     if (Array.isArray(m.mentionedJid) && m.mentionedJid.length > 0) {
       return normalizeJid(m.mentionedJid[0])
     }
-
     const text = (m.text || m.caption || '') + ''
     const match = text.match(/@?(\+?\d{6,15})/g)
     if (match && match.length > 0) {
       const raw = match[0].replace('@', '').replace('+', '')
       return normalizeJid(raw + '@s.whatsapp.net')
     }
-
     return null
   } catch (e) {
     console.warn('extractTargetJid error', e)
     return null
   }
 }
+
+/* ---------- carga inicial ---------- */
+loadShadowbansFromDisk()
 
 /* ---------- handler principal ---------- */
 const handler = async (m, { conn, usedPrefix, command }) => {
@@ -184,9 +179,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     return conn.reply(m.chat, `${formatTitle()}\n❌ No tienes permiso para usar este comando.`, m, ctxErr)
   }
 
-  try {
-    await conn.reply(m.chat, msgUsage(), m, ctxWarn)
-  } catch (e) {}
+  try { await conn.reply(m.chat, msgUsage(), m, ctxWarn) } catch (e) {}
 
   const target = extractTargetJid(m)
   if (!target) {
@@ -203,17 +196,12 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   else if (global.ownerNumber) creators.push(global.ownerNumber)
 
   const normalizedCreators = creators
-    .map(o => {
-      if (!o) return null
-      if (typeof o === 'string') return normalizeJid(o)
-      if (Array.isArray(o) && o[0]) return normalizeJid(o[0])
-      return null
-    })
+    .map(o => { if (!o) return null; if (typeof o === 'string') return normalizeJid(o); if (Array.isArray(o) && o[0]) return normalizeJid(o[0]); return null })
     .filter(Boolean)
 
-  // roles usando lib/lib-roles.js
-  const targetRoles = getUserRoles(target).map(r => String(r).toLowerCase())
-  const punisherRoles = getUserRoles(normalizeJid(m.sender)).map(r => String(r).toLowerCase())
+  // roles usando lib
+  const targetRoles = (getUserRoles(target) || []).map(r => String(r).toLowerCase())
+  const punisherRoles = (getUserRoles(normalizeJid(m.sender)) || []).map(r => String(r).toLowerCase())
 
   const isTargetCreatorByRole = targetRoles.some(r => ['creador','creator','owner'].includes(r))
   const isTargetModByRole = targetRoles.some(r => ['mod','moderator','moderador'].includes(r))
@@ -225,16 +213,11 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   const isCreatorTarget = normalizedCreators.includes(target) || isTargetCreatorByRole
   if (isCreatorTarget) {
     try { await conn.reply(m.chat, msgCreatorAttemptPublic(), m, ctxErr) } catch {}
-
     const punisher = normalizeJid(m.sender)
 
     // si el creador se intenta a sí mismo: solo aviso, no castigo
     if (punisher === target) {
-      try {
-        if (typeof conn.sendMessage === 'function') {
-          await conn.sendMessage(punisher, { text: msgCreatorAttemptPublic() })
-        }
-      } catch (e) {}
+      try { if (typeof conn.sendMessage === 'function') await conn.sendMessage(punisher, { text: msgCreatorAttemptPublic() }) } catch (e) {}
       return
     }
 
@@ -243,24 +226,15 @@ const handler = async (m, { conn, usedPrefix, command }) => {
       const existing = shadowMap.get(punisher)
       if (existing.immutable) {
         return conn.reply(m.chat, `${formatTitle()}\n⚠️ Ya estás bajo un castigo inmutable. Espera a que termine.`, m, ctxErr)
-      } else {
-        const expiresAt = Date.now() + 5 * 60 * 1000
-        shadowMap.set(punisher, { expiresAt, timeoutId: null, actor: 'system', createdAt: Date.now(), chat: m.chat, immutable: true })
-        saveShadowbansToDisk()
-        scheduleUnshadow(punisher, expiresAt - Date.now(), conn)
-        try { await conn.reply(m.chat, msgCreatorPunishPublic(punisher.split('@')[0]), m, { mentions: [punisher] }, ctxOk) } catch {}
-        try { if (typeof conn.sendMessage === 'function') await conn.sendMessage(punisher, { text: msgCreatorPunishDM() }, { mentions: [punisher] }) } catch {}
-        return
       }
-    } else {
-      const expiresAt = Date.now() + 5 * 60 * 1000
-      shadowMap.set(punisher, { expiresAt, timeoutId: null, actor: 'system', createdAt: Date.now(), chat: m.chat, immutable: true })
-      saveShadowbansToDisk()
-      scheduleUnshadow(punisher, expiresAt - Date.now(), conn)
-      try { await conn.reply(m.chat, msgCreatorPunishPublic(punisher.split('@')[0]), m, { mentions: [punisher] }, ctxOk) } catch {}
-      try { if (typeof conn.sendMessage === 'function') await conn.sendMessage(punisher, { text: msgCreatorPunishDM() }, { mentions: [punisher] }) } catch {}
-      return
     }
+    const expiresAt = Date.now() + 5 * 60 * 1000
+    shadowMap.set(punisher, { expiresAt, timeoutId: null, actor: 'system', createdAt: Date.now(), chat: m.chat, immutable: true })
+    saveShadowbansToDisk()
+    scheduleUnshadow(punisher, expiresAt - Date.now(), conn)
+    try { await conn.reply(m.chat, msgCreatorPunishPublic(punisher.split('@')[0]), m, { mentions: [punisher] }, ctxOk) } catch {}
+    try { if (typeof conn.sendMessage === 'function') await conn.sendMessage(punisher, { text: msgCreatorPunishDM() }, { mentions: [punisher] }) } catch {}
+    return
   }
 
   // protección por rol de moderador
@@ -321,9 +295,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     } catch (e) {}
 
     if (!botIsAdmin) {
-      try {
-        await conn.reply(m.chat, `${formatTitle()}\n⚠️ Nota: el bot no es administrador en este grupo. El borrado automático de mensajes no funcionará hasta que el bot sea admin.`, m, ctxWarn)
-      } catch (e) {}
+      try { await conn.reply(m.chat, `${formatTitle()}\n⚠️ Nota: el bot no es administrador en este grupo. El borrado automático de mensajes no funcionará hasta que el bot sea admin.`, m, ctxWarn) } catch (e) {}
     }
 
     if (isDuration) {
@@ -349,7 +321,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   }
 }
 
-/* ---------- before: borrar mensajes de shadowbaneados ---------- */
+/* ---------- before hook para borrar mensajes de shadowbaneados ---------- */
 handler.before = async (m, { conn }) => {
   try {
     if (!m || !m.sender) return
