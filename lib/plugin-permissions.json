@@ -1,34 +1,47 @@
 {
   "roles-management": {
-    "rolesmenu": "basic",
+    "rolmenu": "basic",
     "whois": "basic",
+    "roleinfo": "basic",
+    "grouproles": "basic",
+
     "setrole": "full",
     "addrole": "full",
     "removerole": "full",
-    "roleinfo": "basic",
-    "setpluginrole": "full"
+    "setpluginrole": "full",
+
+    "role-reload": "full",
+    "role-list": "full",
+    "role-roles": "basic"
   },
+
   "main-menu": {
     "menu": "basic",
     "help": "basic"
   },
+
   "antilink": {
     "antilink": "manage"
   },
+
   "welcome": {
     "welcome": "manage",
     "bienvenida": "manage"
   },
+
   "main-ping": {
     "ping": "basic"
   },
+
   "group-kick": {
     "kick": "manage"
   },
+
   "moderation-plugin": {
     "shadowban": "manage",
     "unshadowban": "manage"
   },
+
   "owner-mute": {
     "shadowban": "manage",
     "unshadowban": "manage"
