@@ -118,7 +118,7 @@ const handler = async (m, { conn, command, usedPrefix = '/' }) => {
 }
 
 handler.help = ['randomsticker']
-handler.tags = ['fun', 'media']
+handler.tags = ['multimedia']
 handler.command = ['rsticker', 'randsticker', 'randomsticker']
 handler.group = false
 handler.private = true
