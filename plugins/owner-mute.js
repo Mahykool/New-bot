@@ -2,7 +2,7 @@
 import fs from 'fs'
 import path from 'path'
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
-import { normalizeJid } from '../lib/lib-roles.js'
+import { normalizeJid, getUserRoles, addUserRole, removeUserRole, setUserRole } from '../lib/lib-roles.js'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'shadowbans.json')
@@ -139,6 +139,7 @@ function scheduleAllTimeouts() {
 
 loadShadowbansFromDisk()
 
+/* ---------- extracción robusta del target ---------- */
 function extractTargetJid(m) {
   try {
     if (m.quoted) {
@@ -171,6 +172,7 @@ function extractTargetJid(m) {
   }
 }
 
+/* ---------- handler principal ---------- */
 const handler = async (m, { conn, usedPrefix, command }) => {
   const ctxErr = global.rcanalx || {}
   const ctxWarn = global.rcanalw || {}
@@ -191,7 +193,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     return conn.reply(m.chat, `${formatTitle()}\n‼️ Responde al mensaje del usuario o menciónalo para aplicar shadowban/unshadowban.`, m, ctxWarn)
   }
 
-  // Construir lista de creators desde globals
+  // creators desde globals
   const creators = []
   if (Array.isArray(global.owner)) creators.push(...global.owner)
   else if (global.owner) creators.push(global.owner)
@@ -209,25 +211,24 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     })
     .filter(Boolean)
 
-  // Roles desde global.userRoles (mapa jid -> [roles] o role string)
-  const userRolesMap = global.userRoles || {}
-  const targetRoles = Array.isArray(userRolesMap[target]) ? userRolesMap[target] : (userRolesMap[target] ? [userRolesMap[target]] : [])
-  const punisherRoles = Array.isArray(userRolesMap[normalizeJid(m.sender)]) ? userRolesMap[normalizeJid(m.sender)] : (userRolesMap[normalizeJid(m.sender)] ? [userRolesMap[normalizeJid(m.sender)]] : [])
+  // roles usando lib/lib-roles.js
+  const targetRoles = getUserRoles(target).map(r => String(r).toLowerCase())
+  const punisherRoles = getUserRoles(normalizeJid(m.sender)).map(r => String(r).toLowerCase())
 
-  const isTargetCreatorByRole = targetRoles.some(r => ['creator', 'owner'].includes(String(r).toLowerCase()))
-  const isTargetModByRole = targetRoles.some(r => ['moderator', 'mod'].includes(String(r).toLowerCase()))
+  const isTargetCreatorByRole = targetRoles.some(r => ['creador','creator','owner'].includes(r))
+  const isTargetModByRole = targetRoles.some(r => ['mod','moderator','moderador'].includes(r))
 
   const allBots = Array.isArray(global.allBots) ? global.allBots.slice() : (Array.isArray(global.botNumbers) ? global.botNumbers.slice() : [])
   const normalizedAllBots = allBots.map(normalizeJid).filter(Boolean)
 
-  // Si el objetivo es creator (por globals o por rol)
+  // protección creator (globals o rol)
   const isCreatorTarget = normalizedCreators.includes(target) || isTargetCreatorByRole
   if (isCreatorTarget) {
     try { await conn.reply(m.chat, msgCreatorAttemptPublic(), m, ctxErr) } catch {}
 
     const punisher = normalizeJid(m.sender)
 
-    // Si el creador se intenta a sí mismo: solo aviso, no castigo
+    // si el creador se intenta a sí mismo: solo aviso, no castigo
     if (punisher === target) {
       try {
         if (typeof conn.sendMessage === 'function') {
@@ -237,7 +238,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
       return
     }
 
-    // Si no es el mismo creador, aplicar castigo inmutable 5 minutos
+    // aplicar castigo inmutable 5 minutos al punisher
     if (shadowMap.has(punisher)) {
       const existing = shadowMap.get(punisher)
       if (existing.immutable) {
@@ -262,13 +263,13 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     }
   }
 
-  // Si el objetivo tiene rol de moderador, bloquear acción y notificar
+  // protección por rol de moderador
   if (isTargetModByRole) {
     try { await conn.reply(m.chat, msgModProtected(), m, ctxErr) } catch {}
     return
   }
 
-  // Prevención de shadowban a bots del sistema
+  // prevención de shadowban a bots del sistema
   const botJidRaw = conn.user?.id || conn.user?.jid || null
   const botJid = botJidRaw ? normalizeJid(botJidRaw) : null
   const isSystemBot = (target === botJid) || normalizedAllBots.includes(target)
@@ -276,7 +277,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     return conn.reply(m.chat, `${formatTitle()}\n🤖 No puedes shadowbanear a los bots del sistema. Contacta al creador si hay un problema.`, m, ctxErr)
   }
 
-  // Evitar shadowbanear administradores detectados por metadata
+  // evitar shadowbanear administradores detectados por metadata
   try {
     const meta = typeof conn.groupMetadata === 'function' ? await conn.groupMetadata(m.chat) : null
     if (meta && Array.isArray(meta.participants)) {
@@ -290,14 +291,13 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     }
   } catch (e) {}
 
-  // Parsear duración
+  // parsear duración y ejecutar shadowban/unshadowban
   const text = (m.text || '').trim()
   const parts = text.split(/\s+/).filter(Boolean)
   const durationArg = parts[1] || ''
   const minutes = parseInt(durationArg, 10)
   const isDuration = !isNaN(minutes) && minutes > 0
 
-  // Ejecutar acción
   if (command === 'shadowban' || command === 'mute') {
     if (shadowMap.has(target)) {
       return conn.reply(m.chat, `${formatTitle()}\n⚠️ El usuario ya está shadowbaneado: @${target.split('@')[0]}`, m, { mentions: [target] }, ctxWarn)
@@ -349,6 +349,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   }
 }
 
+/* ---------- before: borrar mensajes de shadowbaneados ---------- */
 handler.before = async (m, { conn }) => {
   try {
     if (!m || !m.sender) return
