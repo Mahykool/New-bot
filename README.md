@@ -10,6 +10,10 @@ termux-setup-storage
 apt update -y && apt upgrade -y && pkg install -y git nodejs ffmpeg imagemagick yarn
 ```
 ```bash
+pkg update -y && pkg upgrade -y
+yes y | pkg install -y git nodejs ffmpeg imagemagick yarn
+```
+```bash
 git clone https://github.com/Mahykool/New-bot.git && cd New-bot
 ```
 ```bash
