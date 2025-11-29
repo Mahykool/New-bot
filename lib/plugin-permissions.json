@@ -17,6 +17,7 @@
   },
   "welcome": {
     "welcome": "manage"
+    "bienvenida": "manage"
   },
   "main-ping": {
     "ping": "basic"
@@ -25,6 +26,10 @@
     "kick": "manage"
   },
   "moderation-plugin": {
+    "shadowban": "manage",
+    "unshadowban": "manage"
+   },
+  "owner-mute": {
     "shadowban": "manage",
     "unshadowban": "manage"
    }
