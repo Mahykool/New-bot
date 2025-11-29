@@ -184,7 +184,7 @@ const handler = async (m, { conn, participants = [], usedPrefix = '', command = 
 }
 
 handler.pluginId = 'group-kick'
-handler.help = ['kick', 'echar', 'sacar', 'ban']
+handler.help = ['kick','ban']
 handler.tags = ['modmenu']
 handler.command = ['kick', 'echar', 'sacar', 'ban']
 handler.group = true
