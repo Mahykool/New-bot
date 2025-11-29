@@ -1,8 +1,8 @@
 {
-  "owner": {
-    "name": "OWNER",
+  "creador": {
+    "name": "CREADOR",
     "icon": "👑",
-    "description": "Control absoluto del sistema",
+    "description": "Control total del sistema",
     "globalPermissions": [
       "MANAGE_ROLES",
       "USE_ALL_PLUGINS"
@@ -12,40 +12,55 @@
     }
   },
 
-  "staff": {
-    "name": "STAFF",
-    "icon": "🛡",
-    "description": "Soporte y moderación",
+  "mod": {
+    "name": "MOD",
+    "icon": "🛡️",
+    "description": "Moderación y soporte avanzado",
     "globalPermissions": [
       "MODERATE_GROUPS"
     ],
     "pluginPermissions": {
-      "antilink": "manage",
-      "welcome": "manage",
       "rolesmenu": "manage",
       "setrole": "manage",
       "addrole": "manage",
-      "removerole": "manage"
+      "removerole": "manage",
+      "welcome": "manage",
+      "antilink": "manage"
     }
   },
 
-  "premium": {
-    "name": "PREMIUM",
-    "icon": "💠",
-    "description": "Usuario con beneficios extendidos",
+  "vip_plus": {
+    "name": "VIP+",
+    "icon": "💎",
+    "description": "Usuario élite con beneficios superiores",
     "globalPermissions": [],
     "pluginPermissions": {
       "main-menu": "basic",
       "welcome": "basic",
       "whois": "basic",
-      "roleinfo": "basic"
+      "roleinfo": "basic",
+      "ping": "basic"
+    }
+  },
+
+  "vip": {
+    "name": "VIP",
+    "icon": "🔥",
+    "description": "Usuario distinguido con beneficios especiales",
+    "globalPermissions": [],
+    "pluginPermissions": {
+      "main-menu": "basic",
+      "welcome": "basic",
+      "whois": "basic",
+      "roleinfo": "basic",
+      "ping": "basic"
     }
   },
 
   "user": {
     "name": "USER",
     "icon": "🔹",
-    "description": "Usuario estándar del sistema",
+    "description": "Usuario estándar",
     "globalPermissions": [],
     "pluginPermissions": {
       "main-menu": "basic",
