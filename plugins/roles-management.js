@@ -3,6 +3,7 @@
 
 import {
   getRolesConfig,
+  saveRolesConfig,
   getUserRoles,
   setUserRole,
   addUserRole,
@@ -190,21 +191,14 @@ Plugins:
         return await conn.reply(m.chat, `✘ Nivel inválido.\nNiveles válidos: ${validLevels.join(', ')}`, m, ctxWarn)
       }
 
-      // Asegurar que el archivo existe y es JSON válido
       try {
-        if (!fs.existsSync(ROLES_PATH)) {
-          // crear plantilla mínima si no existe
-          fs.mkdirSync(path.dirname(ROLES_PATH), { recursive: true })
-          fs.writeFileSync(ROLES_PATH, JSON.stringify({}, null, 2))
-        }
-        const rolesDataRaw = fs.readFileSync(ROLES_PATH, 'utf8') || '{}'
-        const rolesData = JSON.parse(rolesDataRaw)
-
+        const rolesData = getRolesConfig()
         rolesData[roleId] = rolesData[roleId] || {}
         rolesData[roleId].pluginPermissions = rolesData[roleId].pluginPermissions || {}
         rolesData[roleId].pluginPermissions[pluginId] = level
 
-        fs.writeFileSync(ROLES_PATH, JSON.stringify(rolesData, null, 2))
+        // Guardar mediante la función centralizada
+        saveRolesConfig(rolesData)
 
         return await conn.reply(m.chat, `✅ Nivel de acceso actualizado.\nRol: ${roleId}\nPlugin: ${pluginId}\nNuevo nivel: ${level}`, m, ctxOk)
       } catch (errFile) {
