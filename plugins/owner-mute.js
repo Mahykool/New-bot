@@ -1,4 +1,3 @@
-// plugins/shadowban.js
 import fs from 'fs'
 import path from 'path'
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
@@ -22,13 +21,18 @@ const FILE = path.join(DATA_DIR, 'shadowbans.json')
 // Título decorado solicitado
 const PLUGIN_TITLE = 'ஓீ🐙 ㅤׄㅤׅㅤׄ *SHADOWBAN* ㅤ֢ㅤׄㅤׅ'
 
+// Miniaturas estilo GTA SA por defecto (reemplaza por tus URLs)
+const GTA_THUMB_1 = process.env.GTA_THUMB_1 || 'https://i.imgur.com/ejemploGTA1.jpg'
+const GTA_THUMB_2 = process.env.GTA_THUMB_2 || 'https://i.imgur.com/ejemploGTA2.jpg'
+const DEFAULT_GTA_THUMB = GTA_THUMB_1
+
 function ensureDataDir() {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }) } catch {}
 }
 
 /**
  * Estructura en memoria:
- * Map<jid, { expiresAt: number|null, timeoutId: Timeout|null, actor?: string, createdAt?: number }>
+ * Map<jid, { expiresAt: number|null, timeoutId: Timeout|null, actor?: string, createdAt?: number, chat?: string }>
  */
 let shadowMap = new Map()
 
@@ -44,9 +48,10 @@ function loadShadowbansFromDisk() {
       const expiresAt = item.expiresAt || null
       const actor = item.actor || null
       const createdAt = item.createdAt || null
+      const chat = item.chat || null
       if (!jid) continue
       if (expiresAt && expiresAt <= now) continue
-      shadowMap.set(jid, { expiresAt, timeoutId: null, actor, createdAt })
+      shadowMap.set(jid, { expiresAt, timeoutId: null, actor, createdAt, chat })
     }
   } catch (e) {
     console.warn('loadShadowbansFromDisk error', e)
@@ -60,7 +65,8 @@ function saveShadowbansToDisk() {
       jid,
       expiresAt: v.expiresAt || null,
       actor: v.actor || null,
-      createdAt: v.createdAt || null
+      createdAt: v.createdAt || null,
+      chat: v.chat || null
     }))
     fs.writeFileSync(FILE, JSON.stringify(arr, null, 2), 'utf8')
   } catch (e) {
@@ -68,16 +74,31 @@ function saveShadowbansToDisk() {
   }
 }
 
-function scheduleUnshadow(jid, ms) {
+// scheduleUnshadow ahora acepta conn opcional; si no se pasa, intentará usar global.conn
+function scheduleUnshadow(jid, ms, conn = null) {
   const entry = shadowMap.get(jid)
   if (entry && entry.timeoutId) {
     clearTimeout(entry.timeoutId)
   }
   if (!ms || ms <= 0) return
-  const timeoutId = setTimeout(() => {
+  const timeoutId = setTimeout(async () => {
     try {
+      const current = shadowMap.get(jid)
+      if (!current) return
+      // eliminar del mapa y persistir
       shadowMap.delete(jid)
       saveShadowbansToDisk()
+
+      // intentar notificar en el chat donde se aplicó el shadowban
+      const chatId = current.chat || null
+      const connToUse = conn || global.conn || null
+      if (chatId && connToUse && typeof connToUse.sendMessage === 'function') {
+        try {
+          await connToUse.sendMessage(chatId, { text: `> ✅ *El shadowban temporal ha terminado:* @${jid.split('@')[0]}` }, { mentions: [jid] })
+        } catch (e) {
+          console.warn('scheduleUnshadow: fallo al notificar finalización', e)
+        }
+      }
     } catch (e) {
       console.error('scheduleUnshadow error', e)
     }
@@ -95,7 +116,7 @@ function scheduleAllTimeouts() {
       if (ms <= 0) {
         shadowMap.delete(jid)
       } else {
-        scheduleUnshadow(jid, ms)
+        scheduleUnshadow(jid, ms, null)
       }
     }
   }
@@ -111,7 +132,7 @@ const handler = async (m, { conn, usedPrefix, command /* isAdmin eliminado inten
       externalAdReply: {
         title: PLUGIN_TITLE,
         body: '❌ Error',
-        thumbnailUrl: 'https://files.catbox.moe/zh5z6m.jpg',
+        thumbnailUrl: DEFAULT_GTA_THUMB,
         sourceUrl: global.canalOficial || ''
       }
     }
@@ -121,7 +142,7 @@ const handler = async (m, { conn, usedPrefix, command /* isAdmin eliminado inten
       externalAdReply: {
         title: PLUGIN_TITLE,
         body: '⚠️ Advertencia',
-        thumbnailUrl: 'https://files.catbox.moe/zh5z6m.jpg',
+        thumbnailUrl: DEFAULT_GTA_THUMB,
         sourceUrl: global.canalOficial || ''
       }
     }
@@ -131,7 +152,7 @@ const handler = async (m, { conn, usedPrefix, command /* isAdmin eliminado inten
       externalAdReply: {
         title: PLUGIN_TITLE,
         body: '✅ Acción',
-        thumbnailUrl: 'https://qu.ax/QGAVS.jpg',
+        thumbnailUrl: GTA_THUMB_2,
         sourceUrl: global.canalOficial || ''
       }
     }
@@ -143,6 +164,28 @@ const handler = async (m, { conn, usedPrefix, command /* isAdmin eliminado inten
     requireCommandAccess(m.sender, 'moderation-plugin', 'shadowban')
   } catch (err) {
     return conn.reply(m.chat, '❌ No tienes permiso para usar este comando.', m, ctxErr)
+  }
+
+  // Explicación de uso: siempre mostrar las dos opciones (indefinido vs temporal)
+  try {
+    const usageText = [
+      '*Uso del comando shadowban*',
+      '',
+      '1) Shadowban indefinido:',
+      '   - Responde al mensaje del usuario y ejecuta: `shadowban`',
+      '   - Resultado: el usuario queda shadowbaneado hasta que se ejecute `unshadowban`.',
+      '',
+      '2) Shadowban temporal:',
+      '   - Responde al mensaje del usuario y ejecuta: `shadowban <minutos>`',
+      '   - Ejemplo: `shadowban 30` -> shadowban por 30 minutos. Al expirar, el bot notificará automáticamente en el chat que el shadowban terminó.',
+      '',
+      'Comandos relacionados: `unshadowban`, `mute`, `unmute`.'
+    ].join('\n')
+    // enviamos la explicación como advertencia contextual
+    await conn.reply(m.chat, usageText, m, ctxWarn)
+  } catch (e) {
+    // si falla la explicación, no bloqueamos la ejecución
+    console.warn('shadowban: fallo al enviar explicación de uso', e)
   }
 
   // Debe responder a un mensaje objetivo
@@ -190,11 +233,13 @@ const handler = async (m, { conn, usedPrefix, command /* isAdmin eliminado inten
 
     const actor = m.sender || null
     const createdAt = Date.now()
-    shadowMap.set(target, { expiresAt, timeoutId: null, actor, createdAt })
+    // Guardamos también el chat donde se aplicó para poder notificar al expirar
+    shadowMap.set(target, { expiresAt, timeoutId: null, actor, createdAt, chat: m.chat })
     saveShadowbansToDisk()
 
     if (isDuration) {
-      scheduleUnshadow(target, expiresAt - Date.now())
+      // pasamos conn para que la notificación pueda enviarse cuando expire
+      scheduleUnshadow(target, expiresAt - Date.now(), conn)
       return conn.reply(m.chat, `> ✅ *Usuario shadowbaneado por ${minutes} minutos:* @${target.split('@')[0]}`, m, { mentions: [target] }, ctxOk)
     } else {
       return conn.reply(m.chat, `> ✅ *Usuario shadowbaneado permanentemente:* @${target.split('@')[0]}`, m, { mentions: [target] }, ctxOk)
@@ -237,7 +282,7 @@ handler.before = async (m, { conn }) => {
   }
 }
 
-handler.help = ['shadowban', 'unshadowban']
+handler.help = ['shadowban', 'unshadowban', 'mute', 'unmute']
 handler.tags = ['moderation']
 handler.command = ['shadowban', 'unshadowban', 'mute', 'unmute']
 handler.group = true
