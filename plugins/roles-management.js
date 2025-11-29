@@ -13,6 +13,16 @@ import {
 
 import { hasPermission } from '../lib/permissions-middleware.js'
 
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+// Si prefieres usar la raíz del proyecto (process.cwd()), puedes reemplazar __dirname por process.cwd()
+const PROJECT_ROOT = process.cwd()
+const ROLES_PATH = path.join(PROJECT_ROOT, 'lib', 'roles.json')
+
 let handler = async (m, { conn, command, args, usedPrefix }) => {
   const ctxErr = (global.rcanalx || {})
   const ctxWarn = (global.rcanalw || {})
@@ -34,10 +44,9 @@ let handler = async (m, { conn, command, args, usedPrefix }) => {
       const userRoles = getUserRoles(m.sender).join(', ')
       let rolesList = Object.keys(rolesConfig).map(r => `${r} — ${rolesConfig[r].name}`).join('\n')
 
-      const text = `
-==============================
-      SW SYSTEM — ROLES
-==============================
+// Opción 2: template literal (con variables, seguro y sin errores)
+const text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ`
+
 
 👤 Tu rol principal: ${info.icon} ${info.name}
 🔹 Roles asignados: ${userRoles}
@@ -68,10 +77,7 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       const info = getRoleInfo(target)
       const roles = getUserRoles(target).join(', ')
 
-      const text = `
-==============================
-        USER ROLE INFO
-==============================
+      const text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ`
 
 👤 Usuario: ${target}
 👑 Rol principal: ${info.icon} ${info.name}
@@ -189,11 +195,7 @@ Plugins:
         return await conn.reply(m.chat, `✘ Nivel inválido.\nNiveles válidos: ${validLevels.join(', ')}`, m, ctxWarn)
       }
 
-      // Modificar roles.json
-      import fs from 'fs'
-      import path from 'path'
-      const __dirname = process.cwd()
-      const ROLES_PATH = path.join(__dirname, 'lib', 'roles.json')
+      // Modificar roles.json (usando rutas desde la raíz del proyecto)
       const rolesData = JSON.parse(fs.readFileSync(ROLES_PATH, 'utf8'))
 
       rolesData[roleId].pluginPermissions = rolesData[roleId].pluginPermissions || {}
