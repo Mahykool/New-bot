@@ -158,6 +158,6 @@ handler.help = ['randomsticker']
 handler.tags = ['multimedia']
 handler.command = ['rsticker', 'randsticker', 'randomsticker']
 handler.group = true    // permitir en grupos
-handler.private = false  // permitir en privado también
+handler.private = true  // permitir en privado también
 
 export default handler
