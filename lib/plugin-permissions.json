@@ -1,0 +1,24 @@
+{
+  "roles-management": {
+    "rolesmenu": "manage",
+    "whois": "basic",
+    "setrole": "manage",
+    "addrole": "manage",
+    "removerole": "manage",
+    "roleinfo": "basic",
+    "setpluginrole": "full"
+  },
+
+  "main-menu": {
+    "menu": "basic",
+    "help": "basic"
+  },
+
+  "antilink": {
+    "antilink": "manage"
+  },
+
+  "welcome": {
+    "welcome": "basic"
+  }
+}
