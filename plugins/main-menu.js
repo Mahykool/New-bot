@@ -27,10 +27,10 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
       '*MULTIMEDIA*': ['sticker', 'audio', 'anime'],
       '*TOOLS*': ['tools', 'advanced'],
       '*BÚSQUEDA*': ['search', 'buscador'],
-      '*PREMIUM*': ['fun', 'premium', 'social', 'custom'],
-      '*CREADOR*': ['owner', 'creador'],
       '*ROLES*': ['roles'],
-
+      '*VIPS*': ['fun', 'premium', 'social', 'custom'],
+      '*MODERACIÓN*': ['modmenu'],
+      '*CREADOR*': ['owner', 'creador']
     }
 
     for (let catName in categories) {
@@ -47,7 +47,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
       }
     }
 
-    menuText += `\n✦ Diseñado por Mahykol — Estilo GTA SA\n`
+    menuText += `\n✦ Mahykol — SWILL\n`
 
     await conn.sendMessage(m.chat, { react: { text: '✨', key: m.key } })
 
@@ -64,7 +64,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
       {
         name: 'cta_url',
         buttonParamsJson: JSON.stringify({ 
-          display_text: '✘ COMMUNITY LATAM', 
+          display_text: 'COMMUNITY LATAM ✘', 
           url: 'https://chat.whatsapp.com/K02sv6Fm87fBQvlNKIGOQB' 
         })
       },
