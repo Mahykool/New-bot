@@ -97,6 +97,9 @@ ${usedPrefix}roleinfo <rol>
 ${usedPrefix}grouproles  
 → Muestra los roles de todos los integrantes del grupo.
 
+${usedPrefix}roles  
+→ Lista todos los roles disponibles en el sistema.
+
 ━━━━━━━━━━━━━━━━━━
 🛡️ *COMANDOS DE MODERACIÓN*
 (Los permisos se administran en plugin-permissions.json)
@@ -118,9 +121,6 @@ ${usedPrefix}role reload
 
 ${usedPrefix}role list @usuario  
 → Muestra todos los roles asignados a un usuario.
-
-${usedPrefix}role roles  
-→ Lista todos los roles disponibles en el sistema.
 
 ━━━━━━━━━━━━━━━━━━
 📚 *Roles disponibles:*
@@ -203,8 +203,17 @@ ${plugins}
   }
 
   // ------------------------------
+  // ✅ LISTA DE ROLES — .roles
+  // ------------------------------
+  if (cmd === 'roles') {
+    requireCommandAccess(m.sender, 'roles-management', 'roles')
+
+    const available = listRoles().join(', ')
+    return conn.reply(m.chat, format(`Roles disponibles: ${available}`), m, ctxOk)
+  }
+
+  // ------------------------------
   // ✅ COMANDOS DE MODERACIÓN
-  // (Permisos manejados por plugin-permissions.json)
   // ------------------------------
 
   // ✅ SETROLE
@@ -332,14 +341,6 @@ Principal: ${info.name || info.id}
 
     return conn.reply(m.chat, format(text), m, ctxOk)
   }
-
-  // ✅ role roles
-  if (cmd === 'role' && args[0] === 'roles') {
-    requireCommandAccess(m.sender, 'roles-management', 'role-roles')
-
-    const available = listRoles().join(', ')
-    return conn.reply(m.chat, format(`Roles disponibles: ${available}`), m, ctxOk)
-  }
 }
 
 // ------------------------------
@@ -352,6 +353,7 @@ handler.command = [
   'whois',
   'roleinfo',
   'grouproles',
+  'roles',
   'setrole',
   'addrole',
   'removerole',
