@@ -4,6 +4,7 @@
     "whois": "basic",
     "roleinfo": "basic",
     "grouproles": "basic",
+    "roles": "basic",
 
     "setrole": "full",
     "addrole": "full",
@@ -11,8 +12,7 @@
     "setpluginrole": "full",
 
     "role-reload": "full",
-    "role-list": "full",
-    "role-roles": "basic"
+    "role-list": "full"
   },
 
   "main-menu": {
