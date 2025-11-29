@@ -1,47 +1,88 @@
-// SWILL IA - Sistema Antilink Ultra Fuerte (versión corregida)
+// plugins/group-antilink.js
+// Sistema Antilink Ultra Fuerte
+
+import { requireCommandAccess } from '../lib/permissions-middleware.js'
 
 let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }) => {
   const ctxErr = (global.rcanalx || {})
   const ctxWarn = (global.rcanalw || {})
   const ctxOk = (global.rcanalr || {})
 
+  // Solo grupos
   if (!m.isGroup) return conn.reply(m.chat, '❌ Solo puedo usarse en grupos.', m, ctxErr)
-  if (!isAdmin) return conn.reply(m.chat, '⚠️ Solo los administradores pueden usar este comando.', m, ctxErr)
+
+  // Control de nivel (roles SW SYSTEM: creador / mod)
+  // pluginId: "group-antilink"
+  // command:  "antilink"
+  try {
+    requireCommandAccess(m.sender, 'group-antilink', 'antilink')
+  } catch (e) {
+    if (e.code === 'ACCESS_DENIED') {
+      return conn.reply(
+        m.chat,
+        '> No tienes nivel suficiente para configurar el *ANTILINK*.',
+        m,
+        ctxErr
+      )
+    }
+    throw e
+  }
+
+  // Extra: también exigimos ser admin de grupo para no romper grupos ajenos
+  if (!isAdmin) {
+    return conn.reply(
+      m.chat,
+      '⚠️ Solo los administradores del grupo pueden usar este comando.',
+      m,
+      ctxErr
+    )
+  }
 
   const action = args[0]?.toLowerCase()
   if (!global.antilinkStatus) global.antilinkStatus = {}
 
   if (!action) {
-    return conn.reply(m.chat, `
-╭━━━〔 𝐒𝐈𝐒𝐓𝐄𝐌𝐀 𝐀𝐍𝐓𝐈𝐋𝐈𝐍𝐊 🖇️🚫 〕━━━⬣
-┃ ➡️ ${usedPrefix}antilink on      → Activar
-┃ ➡️ ${usedPrefix}antilink off     → Desactivar
-┃ ➡️ ${usedPrefix}antilink status  → Estado
-╰━━━━━━━━━━━━━━⬣
+    return conn.reply(
+      m.chat,
+      `
+ஓீ🐙 ㅤׄㅤׅㅤׄ *ANTILINK* ㅤ֢ㅤׄㅤׅ
 
-> ⚡ *Versión v2 Actualizada* – Protección inteligente con detección avanzada.
-    `.trim(), m, ctxWarn)
+➤ ${usedPrefix}antilink on
+   Activa la protección contra enlaces.
+
+➤ ${usedPrefix}antilink off
+   Desactiva la protección.
+
+➤ ${usedPrefix}antilink status
+   Muestra el estado actual.
+
+⚡ Protección reforzada con detección avanzada de enlaces y redirecciones.
+      `.trim(),
+      m,
+      ctxWarn
+    )
   }
 
   switch (action) {
     case 'on':
     case 'activar':
       global.antilinkStatus[m.chat] = true
-      await conn.reply(m.chat, '🛡️ 𝐀𝐍𝐓𝐈𝐋𝐈𝐍𝐊 𝐀𝐂𝐓𝐈𝐕𝐀𝐃𝐎 ✅️', m, ctxOk)
+      await conn.reply(m.chat, '🛡️ ANTILINK ACTIVADO ✅️', m, ctxOk)
       break
 
     case 'off':
     case 'desactivar':
-      // Eliminar la entrada para evitar confusiones (asi el before la considerará desactivada)
       if (global.antilinkStatus && typeof global.antilinkStatus[m.chat] !== 'undefined') {
         delete global.antilinkStatus[m.chat]
       }
-      await conn.reply(m.chat, '🔓 𝐀𝐍𝐓𝐈𝐋𝐈𝐍𝐊 𝐃𝐄𝐒𝐀𝐂𝐓𝐈𝐕𝐀𝐃𝐎 ❌', m, ctxWarn)
+      await conn.reply(m.chat, '🔓 ANTILINK DESACTIVADO ❌', m, ctxWarn)
       break
 
     case 'status':
     case 'estado':
-      const status = (global.antilinkStatus && global.antilinkStatus[m.chat]) ? '🟢 𝐀𝐂𝐓𝐈𝐕𝐎' : '🔴 𝐃𝐄𝐒𝐀𝐂𝐓𝐈𝐕𝐀𝐃𝐎'
+      const status = (global.antilinkStatus && global.antilinkStatus[m.chat])
+        ? '🟢 ACTIVO'
+        : '🔴 DESACTIVADO'
       await conn.reply(m.chat, `🔰 Estado del Antilink: ${status}`, m, ctxOk)
       break
 
@@ -50,7 +91,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
   }
 }
 
-// 🌸 Detector Antilink Activo (antes del handler)
+// 🌸 Detector Antilink Activo (before)
 handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
   try {
     if (m.isBaileys || !m.isGroup) return
@@ -59,7 +100,6 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
     const messageText = m.text || m.caption || ''
     if (!messageText) return
 
-    // PATRONES MÁS FUERTES Y COMPLETOS (restaurados)
     const linkPatterns = [
       /https?:\/\/[^\s]*/gi,
       /www\.[^\s]*/gi,
@@ -110,58 +150,62 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
     ]
 
     let hasLink = false
-    let detectedLink = ''
 
     for (const pattern of linkPatterns) {
       const matches = messageText.match(pattern)
       if (matches && matches.length > 0) {
         hasLink = true
-        detectedLink = matches[0]
         break
       }
     }
 
-    // Detectar IPs también
     const ipPattern = /\b(?:\d{1,3}\.){3}\d{1,3}\b/gi
     if (!hasLink && ipPattern.test(messageText)) {
       hasLink = true
-      detectedLink = 'Dirección IP detectada'
     }
 
     if (!hasLink) return
     if (isAdmin) return
     if (m.sender === conn.user.jid) return
 
-    // Envío de alerta (formato Itsuki)
-    await conn.sendMessage(m.chat, { 
-      text: `> 💢 𝐄𝐍𝐋𝐀𝐂𝐄 𝐃𝐄𝐓𝐄𝐂𝐓𝐀𝐃𝐎 @${m.sender.split('@')[0]} ⚠️ 𝐄𝐗𝐏𝐔𝐋𝐒𝐈𝐎́𝐍 𝐈𝐍𝐌𝐄𝐃𝐈𝐀𝐓𝐀`,
-      mentions: [m.sender]
-    })
+    await conn.sendMessage(
+      m.chat,
+      {
+        text: `> 💢 𝐄𝐍𝐋𝐀𝐂𝐄 𝐃𝐄𝐓𝐄𝐂𝐓𝐀𝐃𝐎 @${m.sender.split('@')[0]} ⚠️ 𝐄𝐗𝐏𝐔𝐋𝐒𝐈𝐎́𝐍 𝐈𝐍𝐌𝐄𝐃𝐈𝐀𝐓𝐀`,
+        mentions: [m.sender]
+      }
+    )
 
-    // Borrar mensaje (si tiene permisos)
     if (isBotAdmin && m.key) {
       try {
-        await conn.sendMessage(m.chat, { delete: { remoteJid: m.chat, fromMe: false, id: m.key.id, participant: m.sender } })
-      } catch (e) { /* no bloquear si falla */ }
+        await conn.sendMessage(m.chat, {
+        delete: {
+            remoteJid: m.chat,
+            fromMe: false,
+            id: m.key.id,
+            participant: m.sender
+          }
+        })
+      } catch (e) {}
     }
 
-    // Expulsar (si tiene permisos)
     if (isBotAdmin) {
       try {
         await conn.groupParticipantsUpdate(m.chat, [m.sender], 'remove')
-      } catch (e) { /* log en consola */ console.error('Expulsión fallida:', e) }
+      } catch (e) {
+        console.error('Expulsión fallida:', e)
+      }
     }
-
   } catch (err) {
     console.error('Error en antilink.before:', err)
   }
 }
 
+handler.pluginId = 'group-antilink'
 handler.help = ['antilink']
 handler.tags = ['group']
 handler.command = ['antilink', 'antienlace']
 handler.group = true
-handler.admin = true
 handler.botAdmin = true
 
 export default handler
