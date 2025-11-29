@@ -1,17 +1,35 @@
 // plugins/random-sticker.js
-// Envía stickers aleatorios desde ./stickers (webp) o desde una lista de URLs en config.json
+// Envía stickers aleatorios desde ./stickers (webp|png|jpg|jpeg) o desde una lista de URLs en config.json
+// Soporta uso en grupos y en privado. Usa la carpeta de stickers en la raíz del proyecto: <proyecto>/stickers
 
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import fetch from 'node-fetch' // si no está disponible, reemplaza por global fetch en Node 18+
+
+/**
+ * Compatibilidad con fetch:
+ * - Node 18+ tiene global.fetch
+ * - Si no existe, intenta cargar node-fetch dinámicamente (si está instalado)
+ */
+let fetchFn = null
+try { fetchFn = global.fetch } catch {}
+if (!fetchFn) {
+  try {
+    fetchFn = (await import('node-fetch')).default
+  } catch (e) {
+    fetchFn = null
+  }
+}
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+// Ruta de stickers en la raíz del proyecto: <proyecto>/stickers
 const STICKERS_DIR = path.join(process.cwd(), 'stickers')
+// Ruta opcional a config.json en la raíz (para stickerUrls)
 const CONFIG_PATH = path.join(process.cwd(), 'config.json')
 
-// Helper: leer lista de stickers locales
+/** Lista archivos locales en STICKERS_DIR (rutas absolutas) */
 function listLocalStickers() {
   try {
     if (!fs.existsSync(STICKERS_DIR)) return []
@@ -24,7 +42,7 @@ function listLocalStickers() {
   }
 }
 
-// Helper: leer stickerUrls desde config.json (opcional)
+/** Cargar stickerUrls desde config.json (opcional) */
 function loadStickerUrls() {
   try {
     if (!fs.existsSync(CONFIG_PATH)) return []
@@ -37,16 +55,17 @@ function loadStickerUrls() {
   }
 }
 
-// Helper: elegir elemento aleatorio
+/** Elegir elemento aleatorio */
 function pickRandom(arr) {
   if (!Array.isArray(arr) || arr.length === 0) return null
   return arr[Math.floor(Math.random() * arr.length)]
 }
 
-// Helper: descargar URL a Buffer
+/** Descargar URL a Buffer (si fetch está disponible) */
 async function fetchToBuffer(url) {
+  if (!fetchFn) throw new Error('No hay fetch disponible en este entorno')
   try {
-    const res = await fetch(url)
+    const res = await fetchFn(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const buf = await res.arrayBuffer()
     return Buffer.from(buf)
@@ -55,18 +74,22 @@ async function fetchToBuffer(url) {
   }
 }
 
-const handler = async (m, { conn, command, usedPrefix = '/' }) => {
+/**
+ * Handler principal
+ * - Envía máximo 1 sticker por ejecución
+ * - Prioriza archivos locales (80%) y usa URLs remotas como fallback
+ * - Si el envío como sticker falla, intenta enviar como imagen con caption
+ */
+const handler = async (m, { conn }) => {
   try {
-    // 1) Recolectar fuentes
     const local = listLocalStickers()
     const remote = loadStickerUrls()
-    if (local.length === 0 && remote.length === 0) {
-      return conn.reply
-        ? conn.reply(m.chat, `⚠️ No hay stickers disponibles. Coloca archivos .webp en la carpeta "stickers" o añade "stickerUrls" en config.json.`, m)
-        : null
+
+    if ((local.length === 0) && (remote.length === 0)) {
+      const msg = `⚠️ No hay stickers disponibles.\n\nColoca archivos .webp/.png/.jpg/.jpeg en la carpeta:\n${STICKERS_DIR}\n\nO añade un arreglo "stickerUrls" en config.json (raíz del proyecto).`
+      return conn.reply ? conn.reply(m.chat, msg, m) : null
     }
 
-    // 2) Elegir fuente (prioriza local)
     let chosenBuffer = null
     const useLocal = Math.random() < 0.8 && local.length > 0 // 80% local si hay
     if (useLocal && local.length > 0) {
@@ -79,7 +102,7 @@ const handler = async (m, { conn, command, usedPrefix = '/' }) => {
       }
     }
 
-    // 3) Si no hay buffer local, intentar remoto
+    // Si no hay buffer local, intentar remoto (si hay fetch y URLs)
     if (!chosenBuffer && remote.length > 0) {
       const url = pickRandom(remote)
       try {
@@ -90,22 +113,35 @@ const handler = async (m, { conn, command, usedPrefix = '/' }) => {
       }
     }
 
-    // 4) Si aún no hay sticker, fallback
+    // Si aún no hay sticker, intentar leer otro local (por si el primero falló)
+    if (!chosenBuffer && local.length > 0) {
+      for (const file of local) {
+        try {
+          chosenBuffer = fs.readFileSync(file)
+          if (chosenBuffer) break
+        } catch (e) {
+          console.warn('random-sticker: fallback read failed', file, e?.message || e)
+          chosenBuffer = null
+        }
+      }
+    }
+
     if (!chosenBuffer) {
       return conn.reply
-        ? conn.reply(m.chat, `⚠️ No pude obtener un sticker en este momento. Intenta de nuevo más tarde.`, m)
+        ? conn.reply(m.chat, `⚠️ No pude obtener un sticker en este momento. Revisa la carpeta ${STICKERS_DIR} o las URLs en config.json.`, m)
         : null
     }
 
-    // 5) Enviar sticker
-    // Si tienes utils/queue y retry, reemplaza la llamada por enqueueSend(() => sendWithRetry(conn, m.chat, { sticker: chosenBuffer }, { quoted: m }))
+    // Intento principal: enviar como sticker (Baileys-like)
     try {
       await conn.sendMessage(m.chat, { sticker: chosenBuffer }, { quoted: m })
+      return null
     } catch (e) {
-      console.error('random-sticker: sendMessage failed', e)
-      // fallback: intentar enviar como imagen si el cliente no acepta sticker buffer
+      console.warn('random-sticker: sendMessage sticker failed, intentando fallback', e?.message || e)
+      // Fallback: enviar como imagen con caption
       try {
         await conn.sendMessage(m.chat, { image: chosenBuffer, caption: 'Sticker' }, { quoted: m })
+        return null
       } catch (e2) {
         console.error('random-sticker: fallback send failed', e2)
         return conn.reply ? conn.reply(m.chat, `❌ Error al enviar sticker: ${e2?.message || e2}`, m) : null
@@ -117,10 +153,11 @@ const handler = async (m, { conn, command, usedPrefix = '/' }) => {
   }
 }
 
+// Permitir uso en grupos y en privado
 handler.help = ['randomsticker']
 handler.tags = ['multimedia']
 handler.command = ['rsticker', 'randsticker', 'randomsticker']
-handler.group = false
-handler.private = true
+handler.group = true    // permitir en grupos
+handler.private = false  // permitir en privado también
 
 export default handler
