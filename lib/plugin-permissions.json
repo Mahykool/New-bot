@@ -23,11 +23,9 @@
   },
   "group-kick": {
     "kick": "manage"
-  }
-
-{
+  },
   "moderation-plugin": {
     "shadowban": "manage",
     "unshadowban": "manage"
-  }
+   }
 }
