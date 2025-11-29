@@ -32,14 +32,8 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
     throw e
   }
 
-  // Extra: debe ser admin del grupo
-  if (!isAdmin)
-    return conn.reply(
-      m.chat,
-      '⚠️ Solo los administradores del grupo pueden usar este comando.',
-      m,
-      ctxErr
-    )
+  // 🔓 Ya NO exigimos isAdmin:
+  // if (!isAdmin) return ...
 
   const parts = (m.text || '').trim().split(/\s+/)
   const action = (parts[1] || '').toLowerCase()
