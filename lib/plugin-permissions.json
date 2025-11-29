@@ -16,7 +16,7 @@
     "antilink": "manage"
   },
   "welcome": {
-    "welcome": "manage"
+    "welcome": "manage",
     "bienvenida": "manage"
   },
   "main-ping": {
@@ -28,9 +28,9 @@
   "moderation-plugin": {
     "shadowban": "manage",
     "unshadowban": "manage"
-   },
+  },
   "owner-mute": {
     "shadowban": "manage",
     "unshadowban": "manage"
-   }
+  }
 }
