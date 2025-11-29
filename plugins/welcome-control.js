@@ -49,11 +49,11 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
         [
           'ஓீ🐙 ㅤׄㅤׅㅤׄ *WELCOME* ㅤ֢ㅤׄㅤׅ',
           '',
-          '✅ *WELCOME ACTIVADO*',
+          '✅ *ACTIVADO*',
           '',
           'Los mensajes de bienvenida y despedida están ahora activos en este grupo.',
           '',
-          '✦ SW SYSTEM v3.8.0'
+          'sw'
         ].join('\n'),
         m,
         ctxOk
@@ -65,11 +65,11 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
         [
           'ஓீ🐙 ㅤׄㅤׅㅤׄ *WELCOME* ㅤ֢ㅤׄㅤׅ',
           '',
-          '❌ *WELCOME DESACTIVADO*',
+          '❌ *DESACTIVADO*',
           '',
           'Los mensajes de bienvenida y despedida han sido desactivados en este grupo.',
           '',
-          '✦ SW SYSTEM v3.8.0'
+          'sw'
         ].join('\n'),
         m,
         ctxErr
@@ -90,7 +90,7 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
           `• ${usedPrefix}welcome off`,
           `• ${usedPrefix}welcome status`,
           '',
-          '✦ SW SYSTEM v3.8.0'
+          'sw'
         ].join('\n'),
         m,
         ctxWarn
@@ -123,7 +123,7 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
         '',
         '❌ Error: No se pudo cargar el sistema de welcome.',
         '',
-        '✦ SW SYSTEM v3.8.0'
+        'sw'
       ].join('\n'),
       m,
       ctxErr
@@ -132,7 +132,7 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
 }
 
 handler.pluginId = 'group-welcome'
-handler.help = ['welcome', 'bienvenida']
+handler.help = ['welcome']
 handler.tags = ['modmenu']
 handler.command = ['welcome', 'bienvenida']
 handler.group = true
