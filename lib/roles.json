@@ -8,12 +8,10 @@
       "USE_ALL_PLUGINS"
     ],
     "pluginPermissions": {
-      "antilink": "manage",
-      "main-menu": "basic",
-      "ping": "basic",
-      "welcome": "manage"
+      "*": "full"
     }
   },
+
   "staff": {
     "name": "STAFF",
     "icon": "🛡",
@@ -23,33 +21,37 @@
     ],
     "pluginPermissions": {
       "antilink": "manage",
-      "main-menu": "basic",
-      "ping": "basic",
-      "welcome": "manage"
+      "welcome": "manage",
+      "rolesmenu": "manage",
+      "setrole": "manage",
+      "addrole": "manage",
+      "removerole": "manage"
     }
   },
+
   "premium": {
     "name": "PREMIUM",
     "icon": "💠",
     "description": "Usuario con beneficios extendidos",
     "globalPermissions": [],
     "pluginPermissions": {
-      "antilink": "none",
       "main-menu": "basic",
-      "ping": "none",
-      "welcome": "basic"
+      "welcome": "basic",
+      "whois": "basic",
+      "roleinfo": "basic"
     }
   },
+
   "user": {
     "name": "USER",
     "icon": "🔹",
     "description": "Usuario estándar del sistema",
     "globalPermissions": [],
     "pluginPermissions": {
-      "antilink": "none",
       "main-menu": "basic",
-      "ping": "none",
-      "welcome": "basic"
+      "welcome": "basic",
+      "whois": "basic",
+      "roleinfo": "basic"
     }
   }
 }
