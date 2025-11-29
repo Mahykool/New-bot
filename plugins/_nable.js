@@ -238,8 +238,8 @@ let txt = `
 await conn.sendMessage(m.chat, { text: txt }, { quoted: fkontak })
 }
 
-handler.help = ['en', 'dis']
-handler.tags = ['nable', 'owner']
-handler.command = /^((en|dis)able|(tru|fals)e|(turn)?o(n|ff)|[01])$/i
+handler.help = ['enable','disable','on','off']
+handler.tags = ['nable','owner']
+handler.command = ['enable','disable','on','off','true','false','1','0']
 
 export default handler
