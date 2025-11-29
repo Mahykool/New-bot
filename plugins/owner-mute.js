@@ -416,11 +416,11 @@ handler.before = async (m, { conn }) => {
   }
 }
 
-handler.help = ['shadowban', 'unshadowban', 'mute', 'unmute']
+handler.help = ['shadowban']
 handler.tags = ['modmenu']
 handler.command = ['shadowban', 'unshadowban', 'mute', 'unmute']
 handler.group = true
 // No forzamos que el bot sea admin; borrado es tentativa y silenciosa
-handler.botAdmin = false
+handler.botAdmin = true
 
 export default handler
