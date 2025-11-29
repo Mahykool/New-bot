@@ -64,7 +64,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
       {
         name: 'cta_url',
         buttonParamsJson: JSON.stringify({ 
-          display_text: 'Ver comunidad ✘', 
+          display_text: 'Ver comunidad', 
           url: 'https://chat.whatsapp.com/K02sv6Fm87fBQvlNKIGOQB' 
         })
       },
