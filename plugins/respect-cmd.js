@@ -1,33 +1,17 @@
 // plugins/respect-cmd.js
-import fs from 'fs'
+// Comandos para consultar y administrar RESPECT
+// Usa lib/db-respect.js para persistencia atómica
+
 import path from 'path'
-import { normalizeJid } from '../lib/lib-roles.js' // si no existe, puedes comentar o implementar simple normalize
+import fs from 'fs'
+import { normalizeJid } from '../lib/lib-roles.js' // si no existe, el fallback usa el string crudo
+import {
+  loadRespectDB,
+  saveRespectDB,
+  ensureUserEntry
+} from '../lib/db-respect.js'
 
-const DB_DIR = path.join(process.cwd(), 'database')
-const pathRespect = path.join(DB_DIR, 'respect.json')
-
-// Asegurar carpeta y archivo
-if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
-if (!fs.existsSync(pathRespect)) fs.writeFileSync(pathRespect, JSON.stringify({}, null, 2), 'utf8')
-
-// Cargar DB con manejo de errores
-let respectDB = {}
-try {
-  const raw = fs.readFileSync(pathRespect, 'utf8')
-  respectDB = raw.trim() ? JSON.parse(raw) : {}
-} catch (e) {
-  console.warn('respect-cmd: fallo leyendo respect.json, se crea DB vacía', e?.message || e)
-  respectDB = {}
-  try { fs.writeFileSync(pathRespect, JSON.stringify(respectDB, null, 2), 'utf8') } catch {}
-}
-
-function saveRespectDB() {
-  try {
-    fs.writeFileSync(pathRespect, JSON.stringify(respectDB, null, 2), 'utf8')
-  } catch (e) {
-    console.error('respect-cmd: fallo guardando respect.json', e)
-  }
-}
+const DB_PATH = path.join(process.cwd(), 'database', 'respect.json')
 
 // Obtener rango según RESPECT
 function getRespectRank(points = 0) {
@@ -41,74 +25,47 @@ function getRespectRank(points = 0) {
 // Verificar si es creador (usa global.owner si existe)
 function isOwner(m) {
   if (!m || !m.sender) return false
-  // normalizar sender
-  const sender = typeof normalizeJid === 'function' ? normalizeJid(m.sender) : String(m.sender)
+  const sender = (typeof normalizeJid === 'function') ? normalizeJid(m.sender) : String(m.sender)
   if (global.owner) {
     const owners = Array.isArray(global.owner) ? global.owner.flat() : [global.owner]
     return owners.some(v => {
       if (!v) return false
       const id = typeof v === 'string' ? v : (Array.isArray(v) ? v[0] : String(v))
-      const ownerJid = typeof normalizeJid === 'function' ? normalizeJid(id) : String(id)
+      const ownerJid = (typeof normalizeJid === 'function') ? normalizeJid(id) : String(id)
       return ownerJid && sender && sender === ownerJid
     })
   }
-  // fallback: número local (ejemplo Chile +56)
-  return sender && sender.startsWith('56')
+  return sender && sender.startsWith('56') // fallback local
 }
 
-// Helper para asegurar estructura de usuario en DB
-function ensureUserEntry(jid) {
-  if (!jid) return
-  if (!respectDB[jid]) {
-    respectDB[jid] = {
-      respect: 0,
-      robCount: 0,
-      windowStart: 0,
-      totalRobs: 0,
-      punishLevel: 0
-    }
-  }
-}
-
-// Handler principal
 const handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) => {
   const cmd = (command || '').toLowerCase()
-  const user = typeof normalizeJid === 'function' ? normalizeJid(m.sender) : String(m.sender)
+  const userJid = (typeof normalizeJid === 'function') ? normalizeJid(m.sender) : String(m.sender)
 
-  ensureUserEntry(user)
-  const data = respectDB[user]
+  const db = loadRespectDB()
+  ensureUserEntry(db, userJid)
+  const data = db[userJid]
 
-  // mirespect
   if (cmd === 'mirespect') {
     const robosDisponibles = Math.max(0, 3 - (data.robCount || 0))
-    return (conn && typeof conn.reply === 'function')
-      ? conn.reply(m.chat, `✦ *Tu RESPECT — SW SYSTEM*\n\n✦ RESPECT: *${data.respect}*\n✦ Robos disponibles: *${robosDisponibles}*\n✦ Robos realizados: *${data.totalRobs || 0}*`, m)
-      : null
+    return conn.reply ? conn.reply(m.chat, `✦ Tu RESPECT — SW SYSTEM\n\n✦ RESPECT: *${data.respect}*\n✦ Robos disponibles: *${robosDisponibles}*\n✦ Robos realizados: *${data.totalRobs || 0}*`, m) : null
   }
 
-  // respectrango
   if (cmd === 'respectrango') {
     const rango = getRespectRank(data.respect)
-    return (conn && typeof conn.reply === 'function')
-      ? conn.reply(m.chat,
-        `✦ *Tu Rango — SW SYSTEM*\n\n✦ RESPECT: *${data.respect}*\n✦ Rango actual: *${rango}*\n\n▸ 0–99 → Busta\n▸ 100–299 → Gangsta\n▸ 300–799 → OG\n▸ 800–1999 → Grove Street Legend\n▸ 2000+ → Big Smoke Tier`, m)
-      : null
+    return conn.reply ? conn.reply(m.chat,
+      `✦ Tu Rango — SW SYSTEM\n\n✦ RESPECT: *${data.respect}*\n✦ Rango actual: *${rango}*\n\n▸ 0–99 → Busta\n▸ 100–299 → Gangsta\n▸ 300–799 → OG\n▸ 800–1999 → Grove Street Legend\n▸ 2000+ → Big Smoke Tier`, m) : null
   }
 
-  // respectinfo
   if (cmd === 'respectinfo') {
-    return (conn && typeof conn.reply === 'function')
-      ? conn.reply(m.chat,
-        `✦ *Sistema RESPECT — SW SYSTEM*\n\n✦ Cada robo de sticker dentro del límite suma *+5 RESPECT*.\n✦ Máximo *3 robos* por ventana de *5 minutos*.\n✦ Después del 3° robo, cada robo extra aplica un *castigo progresivo*:\n   • 1° exceso: -5 RESPECT\n   • 2° exceso: -10 RESPECT\n   • 3° exceso: -20 RESPECT\n   • 4° exceso: -40 RESPECT\n\n✦ Pasados 5 minutos desde el 3er robo, la ventana se reinicia.\n✦ Tus puntos se guardan y no se pierden al reiniciar el bot.\n\n✦ Rangos:\n   • 0–99 → Busta\n   • 100–299 → Gangsta\n   • 300–799 → OG\n   • 800–1999 → Grove Street Legend\n   • 2000+ → Big Smoke Tier`, m)
-      : null
+    return conn.reply ? conn.reply(m.chat,
+      `✦ Sistema RESPECT — SW SYSTEM\n\n✦ Cada robo de sticker dentro del límite suma *+5 RESPECT*.\n✦ Máximo *3 robos* por ventana de *5 minutos*.\n✦ Después del 3° robo, cada robo extra aplica un *castigo progresivo*.\n✦ Pasados 5 minutos desde el 3er robo, la ventana se reinicia.\n✦ Tus puntos se guardan y no se pierden al reiniciar el bot.`, m) : null
   }
 
-  // comandos solo creador
+  // Comandos de administración (solo owner)
   if (['respectreset', 'respectgive', 'respecttake', 'respectset', 'respecttop'].includes(cmd)) {
     if (!isOwner(m)) {
-      return (conn && typeof conn.reply === 'function')
-        ? conn.reply(m.chat, '> Este comando solo puede usarlo el *Creador del bot*.', m)
-        : null
+      return conn.reply ? conn.reply(m.chat, '> Este comando solo puede usarlo el Creador del bot.', m) : null
     }
   }
 
@@ -118,29 +75,31 @@ const handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) =
     const arg = (args[0] || '').toLowerCase()
 
     if (arg === 'all') {
-      Object.keys(respectDB).forEach(jid => {
-        respectDB[jid].respect = 0
-        respectDB[jid].totalRobs = 0
-        respectDB[jid].robCount = 0
-        respectDB[jid].punishLevel = 0
+      const dbAll = loadRespectDB()
+      Object.keys(dbAll).forEach(jid => {
+        dbAll[jid].respect = 0
+        dbAll[jid].totalRobs = 0
+        dbAll[jid].robCount = 0
+        dbAll[jid].punishLevel = 0
       })
-      saveRespectDB()
-      return conn.reply(m.chat, '✦ Todos los registros de RESPECT han sido *reiniciados*.', m)
+      await saveRespectDB(dbAll)
+      return conn.reply ? conn.reply(m.chat, '✦ Todos los registros de RESPECT han sido reiniciados.', m) : null
     }
 
     if (!target) {
-      return conn.reply(m.chat,
-        `✦ Usa:\n• *${usedPrefix}respectreset @usuario* → resetear 1 usuario\n• *${usedPrefix}respectreset all* → resetear todos`, m)
+      return conn.reply ? conn.reply(m.chat,
+        `✦ Usa:\n• ${usedPrefix}respectreset @usuario → resetear 1 usuario\n• ${usedPrefix}respectreset all → resetear todos`, m) : null
     }
 
-    const t = typeof normalizeJid === 'function' ? normalizeJid(target) : target
-    ensureUserEntry(t)
-    respectDB[t].respect = 0
-    respectDB[t].totalRobs = 0
-    respectDB[t].robCount = 0
-    respectDB[t].punishLevel = 0
-    saveRespectDB()
-    return conn.reply(m.chat, `✦ RESPECT de *@${t.split('@')[0]}* ha sido *reiniciado*.`, m, { mentions: [t] })
+    const t = (typeof normalizeJid === 'function') ? normalizeJid(target) : target
+    const db2 = loadRespectDB()
+    ensureUserEntry(db2, t)
+    db2[t].respect = 0
+    db2[t].totalRobs = 0
+    db2[t].robCount = 0
+    db2[t].punishLevel = 0
+    await saveRespectDB(db2)
+    return conn.reply ? conn.reply(m.chat, `✦ RESPECT de *@${t.split('@')[0]}* ha sido reiniciado.`, m, { mentions: [t] }) : null
   }
 
   // respectgive / respecttake / respectset
@@ -148,38 +107,40 @@ const handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) =
     const target = (m.mentionedJid && m.mentionedJid[0]) || null
     const amount = parseInt(args[1])
     if (!target || isNaN(amount)) {
-      return conn.reply(m.chat,
-        `✦ Uso correcto:\n• *${usedPrefix}respectgive @usuario 50*\n• *${usedPrefix}respecttake @usuario 20*\n• *${usedPrefix}respectset @usuario 150*`, m)
+      return conn.reply ? conn.reply(m.chat,
+        `✦ Uso correcto:\n• ${usedPrefix}respectgive @usuario 50\n• ${usedPrefix}respecttake @usuario 20\n• ${usedPrefix}respectset @usuario 150`, m) : null
     }
 
-    const t = typeof normalizeJid === 'function' ? normalizeJid(target) : target
-    ensureUserEntry(t)
+    const t = (typeof normalizeJid === 'function') ? normalizeJid(target) : target
+    const db3 = loadRespectDB()
+    ensureUserEntry(db3, t)
 
     if (cmd === 'respectgive') {
-      respectDB[t].respect += amount
+      db3[t].respect += amount
     } else if (cmd === 'respecttake') {
-      respectDB[t].respect -= amount
-      if (respectDB[t].respect < 0) respectDB[t].respect = 0
+      db3[t].respect -= amount
+      if (db3[t].respect < 0) db3[t].respect = 0
     } else if (cmd === 'respectset') {
-      respectDB[t].respect = amount
+      db3[t].respect = amount
     }
 
-    saveRespectDB()
-    const rango = getRespectRank(respectDB[t].respect)
-    return conn.reply(m.chat,
-      `✦ RESPECT actualizado para *@${t.split('@')[0]}*\n\n✦ RESPECT: *${respectDB[t].respect}*\n✦ Rango: *${rango}*`, m, { mentions: [t] })
+    await saveRespectDB(db3)
+    const rango = getRespectRank(db3[t].respect)
+    return conn.reply ? conn.reply(m.chat,
+      `✦ RESPECT actualizado para *@${t.split('@')[0]}*\n\n✦ RESPECT: *${db3[t].respect}*\n✦ Rango: *${rango}*`, m, { mentions: [t] }) : null
   }
 
   // respecttop
   if (cmd === 'respecttop') {
-    const entries = Object.entries(respectDB)
+    const dbTop = loadRespectDB()
+    const entries = Object.entries(dbTop)
       .filter(([jid, info]) => typeof info.respect === 'number')
       .sort((a, b) => b[1].respect - a[1].respect)
       .slice(0, 10)
 
-    if (!entries.length) return conn.reply(m.chat, '✦ No hay datos de RESPECT aún.', m)
+    if (!entries.length) return conn.reply ? conn.reply(m.chat, '✦ No hay datos de RESPECT aún.', m) : null
 
-    let texto = '✦ *TOP 10 RESPECT — SW SYSTEM*\n\n'
+    let texto = '✦ TOP 10 RESPECT — SW SYSTEM\n\n'
     let pos = 1
     for (const [jid, info] of entries) {
       const rango = getRespectRank(info.respect)
@@ -188,7 +149,7 @@ const handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) =
       pos++
     }
 
-    return conn.reply(m.chat, texto, m, { mentions: entries.map(([jid]) => jid) })
+    return conn.reply ? conn.reply(m.chat, texto, m, { mentions: entries.map(([jid]) => jid) }) : null
   }
 }
 
