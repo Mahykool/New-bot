@@ -18,7 +18,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
     let menuText = `ஓீ🐙 ㅤׄㅤׅㅤׄ *MENUS* ㅤ֢ㅤׄㅤׅ`
 
     const categories = {
-      '*NAKANO-INFO*': ['main', 'info'],
+      '*INFO*': ['main', 'info'],
       '*INTELIGENCIA*': ['bots', 'ia'],
       '*JUEGOS*': ['game', 'gacha'],
       '*ECONOMÍA*': ['economy', 'rpgnk'],
@@ -27,8 +27,10 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
       '*MULTIMEDIA*': ['sticker', 'audio', 'anime'],
       '*TOOLS*': ['tools', 'advanced'],
       '*BÚSQUEDA*': ['search', 'buscador'],
-      '*NK-PREM*': ['fun', 'premium', 'social', 'custom'],
-      '*NK-OWNER*': ['owner', 'creador'],
+      '*PREMIUM*': ['fun', 'premium', 'social', 'custom'],
+      '*CREADOR*': ['owner', 'creador'],
+      '*ROLES*': ['roles'],
+
     }
 
     for (let catName in categories) {
@@ -101,7 +103,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
 
 handler.help = ['menu','help']
 handler.tags = ['main']
-handler.command = ['itsuki', 'menu', 'help']
+handler.command = ['Swill', 'menu', 'help']
 
 handler.before = async function (m, { conn }) {}
 
