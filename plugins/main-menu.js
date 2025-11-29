@@ -15,12 +15,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
       }))
 
     // ✅ Encabezado GTA SA aplicado
-    let menuText = `
-==============================
-        SWILL SYSTEM
-==============================
-
-`
+    let menuText = `ஓீ🐙 ㅤׄㅤׅㅤׄ *MENUS* ㅤ֢ㅤׄㅤׅ`
 
     const categories = {
       '*NAKANO-INFO*': ['main', 'info'],
