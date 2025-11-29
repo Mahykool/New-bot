@@ -25,4 +25,8 @@
   "group-kick": {
   "kick": "manage"
 }
+
+  "main-ping": {
+  "ping": "manage"
+}
 }
