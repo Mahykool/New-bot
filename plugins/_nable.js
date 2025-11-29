@@ -238,7 +238,7 @@ let txt = `
 await conn.sendMessage(m.chat, { text: txt }, { quoted: fkontak })
 }
 
-handler.help = ['enable','disable','on','off']
+handler.help = ['enable','disable']
 handler.tags = ['nable','owner']
 handler.command = ['enable','disable','on','off','true','false','1','0']
 
