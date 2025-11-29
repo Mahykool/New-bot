@@ -81,7 +81,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
 
     const interactiveMessage = proto.Message.InteractiveMessage.fromObject({
       body: proto.Message.InteractiveMessage.Body.fromObject({ text: menuText }),
-      footer: proto.Message.InteractiveMessage.Footer.fromObject({ text: '==============================\n      SWILL SYSTEM V3.8\n==============================' }),
+      footer: proto.Message.InteractiveMessage.Footer.fromObject({ text: `ஓீ🐙 ㅤׄㅤׅㅤׄ *Swill-Bot* ㅤ֢ㅤׄㅤׅ` }),
       header,
       nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.fromObject({
         buttons: nativeButtons
