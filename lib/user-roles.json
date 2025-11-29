@@ -1,7 +1,7 @@
 {
-  "56969066865@s.whatsapp.net": ["owner"],
-  "569XXXXXXXX@s.whatsapp.net": ["owner"],
-  "569XXXXXXXX@s.whatsapp.net": ["staff"],
-  "569XXXXXXXX@s.whatsapp.net": ["premium"],
+  "56969066865@s.whatsapp.net": ["creador"],
+  "569XXXXXXXX@s.whatsapp.net": ["creador"],
+  "569XXXXXXXX@s.whatsapp.net": ["mod"],
+  "569XXXXXXXX@s.whatsapp.net": ["vip_plus"],
+  "569XXXXXXXX@s.whatsapp.net": ["vip"],
   "00000000000@s.whatsapp.net": ["user"]
-}
