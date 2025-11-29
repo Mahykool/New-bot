@@ -1,17 +1,40 @@
 // plugins/owner-mute.js
+// SW SYSTEM — Shadowban / Owner Mute (versión corregida, normalizada y con mejoras)
+// - Usa normalizeJid central desde lib-roles
+// - Mejor manejo de borrado de mensajes con múltiples fallbacks
+// - Logging de auditoría (append a data/shadowbans-audit.log)
+// - Uso consistente de ctx (rcanal*) y mensajes claros
+
 import fs from 'fs'
 import path from 'path'
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
-import { normalizeJid, getUserRoles, addUserRole, removeUserRole, setUserRole } from '../lib/lib-roles.js'
+import {
+  normalizeJid,
+  getUserRoles,
+  addUserRole,
+  removeUserRole,
+  setUserRole
+} from '../lib/lib-roles.js'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'shadowbans.json')
+const AUDIT_LOG = path.join(DATA_DIR, 'shadowbans-audit.log')
 
 const TITLE = 'ㅤׄㅤׅㅤׄ _*SHADOWBAN*_ ㅤ֢ㅤׄㅤׅ'
-function formatTitle() { return `${TITLE}\n` }
+const formatTitle = () => `${TITLE}\n`
 
 function ensureDataDir() {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }) } catch {}
+}
+
+function auditLog(line) {
+  try {
+    ensureDataDir()
+    const ts = new Date().toISOString()
+    fs.appendFileSync(AUDIT_LOG, `[${ts}] ${line}\n`, 'utf8')
+  } catch (e) {
+    console.warn('auditLog error', e)
+  }
 }
 
 /* ---------- persistencia shadowbans ---------- */
@@ -103,6 +126,7 @@ function scheduleUnshadow(jid, ms, conn = null) {
           console.warn('scheduleUnshadow notify error', e)
         }
       }
+      auditLog(`AUTO-UNSHADOW ${jid} (expired)`)
     } catch (e) {
       console.error('scheduleUnshadow error', e)
     }
@@ -117,8 +141,11 @@ function scheduleAllTimeouts() {
   for (const [jid, v] of shadowMap.entries()) {
     if (v.expiresAt) {
       const ms = v.expiresAt - now
-      if (ms <= 0) shadowMap.delete(jid)
-      else scheduleUnshadow(jid, ms, null)
+      if (ms <= 0) {
+        shadowMap.delete(jid)
+      } else {
+        scheduleUnshadow(jid, ms, null)
+      }
     }
   }
   saveShadowbansToDisk()
@@ -166,6 +193,33 @@ function extractTargetJid(m) {
 
 /* ---------- carga inicial ---------- */
 loadShadowbansFromDisk()
+scheduleAllTimeouts()
+
+/* ---------- helper borrar mensaje con fallbacks ---------- */
+async function tryDeleteMessage(conn, chat, key) {
+  try {
+    // Baileys v4+ style
+    if (typeof conn.deleteMessage === 'function') {
+      // deleteMessage(chatId, messageKey)
+      await conn.deleteMessage(chat, key)
+      return true
+    }
+    // Some libs accept sendMessage with delete payload
+    if (typeof conn.sendMessage === 'function') {
+      try {
+        await conn.sendMessage(chat, { delete: key })
+        return true
+      } catch (e) {
+        // ignore and try other fallbacks
+      }
+    }
+    // Some libs expose groupParticipantsUpdate or other methods; nothing else to do here
+    return false
+  } catch (e) {
+    console.warn('tryDeleteMessage error', e)
+    return false
+  }
+}
 
 /* ---------- handler principal ---------- */
 const handler = async (m, { conn, usedPrefix, command }) => {
@@ -232,8 +286,9 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     shadowMap.set(punisher, { expiresAt, timeoutId: null, actor: 'system', createdAt: Date.now(), chat: m.chat, immutable: true })
     saveShadowbansToDisk()
     scheduleUnshadow(punisher, expiresAt - Date.now(), conn)
-    try { await conn.reply(m.chat, msgCreatorPunishPublic(punisher.split('@')[0]), m, { mentions: [punisher] }, ctxOk) } catch {}
-    try { if (typeof conn.sendMessage === 'function') await conn.sendMessage(punisher, { text: msgCreatorPunishDM() }, { mentions: [punisher] }) } catch {}
+    auditLog(`IMMUTABLE-SHADOW ${punisher} by ${normalizeJid(m.sender)} (attempted shadowban creator)`)
+    try { await conn.reply(m.chat, msgCreatorPunishPublic(punisher.split('@')[0]), m, { mentions: [punisher] }) } catch {}
+    try { if (typeof conn.sendMessage === 'function') await conn.sendMessage(punisher, { text: msgCreatorPunishDM() }) } catch {}
     return
   }
 
@@ -284,6 +339,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     const createdAt = Date.now()
     shadowMap.set(target, { expiresAt, timeoutId: null, actor, createdAt, chat: m.chat, immutable: false })
     saveShadowbansToDisk()
+    auditLog(`SHADOW ${target} by ${actor} duration=${isDuration ? minutes+'m' : 'perm'}`)
 
     let botIsAdmin = false
     try {
@@ -317,6 +373,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     if (entry && entry.timeoutId) clearTimeout(entry.timeoutId)
     shadowMap.delete(target)
     saveShadowbansToDisk()
+    auditLog(`UNSHADOW ${target} by ${normalizeJid(m.sender)}`)
     return conn.reply(m.chat, `${formatTitle()}\n✅ Usuario des-shadowbaneado: @${target.split('@')[0]}`, m, { mentions: [target] }, ctxOk)
   }
 }
@@ -333,11 +390,18 @@ handler.before = async (m, { conn }) => {
     if (!shadowMap.has(sender)) return
     if (m.mtype === 'stickerMessage') return
 
+    // Intentar borrar el mensaje con varios fallbacks
     try {
-      if (typeof conn.sendMessage === 'function') {
-        await conn.sendMessage(m.chat, { delete: m.key })
+      const deleted = await tryDeleteMessage(conn, m.chat, m.key)
+      if (!deleted) {
+        // último recurso: si la librería soporta revoke or delete by id
+        if (typeof conn.revokeMessage === 'function') {
+          try { await conn.revokeMessage(m.chat, [m.key]) } catch {}
+        }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn('shadowban before delete error', e)
+    }
   } catch (e) {
     console.error('shadowban before error', e)
   }
