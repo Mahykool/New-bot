@@ -19,36 +19,34 @@ import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-// Si prefieres usar la raíz del proyecto (process.cwd()), puedes reemplazar __dirname por process.cwd()
 const PROJECT_ROOT = process.cwd()
 const ROLES_PATH = path.join(PROJECT_ROOT, 'lib', 'roles.json')
 
-let handler = async (m, { conn, command, args, usedPrefix }) => {
+let handler = async (m, { conn, command, args = [], usedPrefix = '/' }) => {
   const ctxErr = (global.rcanalx || {})
   const ctxWarn = (global.rcanalw || {})
   const ctxOk = (global.rcanalr || {})
 
   try {
-    // Solo quien tenga MANAGE_ROLES puede usar estas funciones
+    // Permiso requerido para administrar roles
     if (!hasPermission(m.sender, 'MANAGE_ROLES')) {
       return await conn.reply(m.chat, '✘ No tienes permisos para administrar roles.', m, ctxWarn)
     }
 
-    const rolesConfig = getRolesConfig()
-    const cmd = command.toLowerCase()
+    const rolesConfig = getRolesConfig ? getRolesConfig() : {}
+    const cmd = (command || '').toLowerCase()
 
     // rolesmenu
     if (cmd === 'rolesmenu') {
       handler.pluginId = 'rolesmenu'
-      const info = getRoleInfo(m.sender)
-      const userRoles = getUserRoles(m.sender).join(', ')
-      let rolesList = Object.keys(rolesConfig).map(r => `${r} — ${rolesConfig[r].name}`).join('\n')
+      const info = getRoleInfo(m.sender) || { icon: '', name: 'Usuario' }
+      const userRoles = (getUserRoles(m.sender) || []).join(', ') || 'ninguno'
+      const rolesList = Object.keys(rolesConfig).map(r => `${r} — ${rolesConfig[r].name || r}`).join('\n') || 'ninguno'
 
-// Opción 2: template literal (con variables, seguro y sin errores)
-const text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ`
+      const text = `
+ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ
 
-
-👤 Tu rol principal: ${info.icon} ${info.name}
+👤 Tu rol principal: ${info.icon || ''} ${info.name || 'Usuario'}
 🔹 Roles asignados: ${userRoles}
 
 Roles disponibles:
@@ -62,7 +60,7 @@ ${usedPrefix}addrole @usuario ROL
 ${usedPrefix}removerole @usuario ROL
 ${usedPrefix}roleinfo ROL
 ${usedPrefix}setpluginrole ROL pluginId nivel
-      `.trim()
+`.trim()
 
       return await conn.reply(m.chat, text, m, ctxOk)
     }
@@ -74,15 +72,15 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
         return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}whois @usuario`, m, ctxWarn)
       }
       const target = m.mentionedJid[0]
-      const info = getRoleInfo(target)
-      const roles = getUserRoles(target).join(', ')
+      const info = getRoleInfo(target) || { icon: '', name: 'Usuario' }
+      const roles = (getUserRoles(target) || []).join(', ') || 'ninguno'
 
       const text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ`
 
 👤 Usuario: ${target}
-👑 Rol principal: ${info.icon} ${info.name}
+👑 Rol principal: ${info.icon || ''} ${info.name || 'Usuario'}
 🔹 Roles asignados: ${roles}
-      `.trim()
+`.trim()
 
       return await conn.reply(m.chat, text, m, ctxOk)
     }
@@ -98,11 +96,11 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       const roleId = normalizeRoleId(raw)
 
       if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ')
+        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
         return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
       }
 
-      const newRoles = setUserRole(target, roleId)
+      const newRoles = setUserRole(target, roleId) || []
       return await conn.reply(m.chat, `✅ Rol principal actualizado.\nUsuario: ${target}\nRoles actuales: ${newRoles.join(', ')}`, m, ctxOk)
     }
 
@@ -117,11 +115,11 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       const roleId = normalizeRoleId(raw)
 
       if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ')
+        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
         return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
       }
 
-      const newRoles = addUserRole(target, roleId)
+      const newRoles = addUserRole(target, roleId) || []
       return await conn.reply(m.chat, `✅ Rol agregado.\nUsuario: ${target}\nRoles actuales: ${newRoles.join(', ')}`, m, ctxOk)
     }
 
@@ -135,7 +133,7 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       const raw = (args[1] || '').toLowerCase()
       const roleId = normalizeRoleId(raw)
 
-      const newRoles = removeUserRole(target, roleId)
+      const newRoles = removeUserRole(target, roleId) || []
       return await conn.reply(m.chat, `✅ Rol removido.\nUsuario: ${target}\nRoles actuales: ${newRoles.join(', ')}`, m, ctxOk)
     }
 
@@ -146,20 +144,17 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       const roleId = normalizeRoleId(raw)
 
       if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ')
+        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
         return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
       }
 
-      const role = rolesConfig[roleId]
-      let text = `
-==============================
-         ROLE INFO
-==============================
+      const role = rolesConfig[roleId] || {}
+      let text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ`
 
 ID: ${roleId}
-Nombre: ${role.name}
-Icono: ${role.icon}
-Descripción: ${role.description}
+Nombre: ${role.name || roleId}
+Icono: ${role.icon || ''}
+Descripción: ${role.description || 'ninguna'}
 
 Permisos globales: ${ (role.globalPermissions || []).join(', ') || 'ninguno' }
 
@@ -180,10 +175,10 @@ Plugins:
       const roleId = normalizeRoleId(rawRole)
       const pluginId = (args[1] || '').toLowerCase()
       const level = (args[2] || '').toLowerCase()
-      const validLevels = ['none','basic','manage','full']
+      const validLevels = ['none', 'basic', 'manage', 'full']
 
       if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ')
+        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
         return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
       }
 
@@ -195,27 +190,38 @@ Plugins:
         return await conn.reply(m.chat, `✘ Nivel inválido.\nNiveles válidos: ${validLevels.join(', ')}`, m, ctxWarn)
       }
 
-      // Modificar roles.json (usando rutas desde la raíz del proyecto)
-      const rolesData = JSON.parse(fs.readFileSync(ROLES_PATH, 'utf8'))
+      // Asegurar que el archivo existe y es JSON válido
+      try {
+        if (!fs.existsSync(ROLES_PATH)) {
+          // crear plantilla mínima si no existe
+          fs.mkdirSync(path.dirname(ROLES_PATH), { recursive: true })
+          fs.writeFileSync(ROLES_PATH, JSON.stringify({}, null, 2))
+        }
+        const rolesDataRaw = fs.readFileSync(ROLES_PATH, 'utf8') || '{}'
+        const rolesData = JSON.parse(rolesDataRaw)
 
-      rolesData[roleId].pluginPermissions = rolesData[roleId].pluginPermissions || {}
-      rolesData[roleId].pluginPermissions[pluginId] = level
+        rolesData[roleId] = rolesData[roleId] || {}
+        rolesData[roleId].pluginPermissions = rolesData[roleId].pluginPermissions || {}
+        rolesData[roleId].pluginPermissions[pluginId] = level
 
-      fs.writeFileSync(ROLES_PATH, JSON.stringify(rolesData, null, 2))
+        fs.writeFileSync(ROLES_PATH, JSON.stringify(rolesData, null, 2))
 
-      return await conn.reply(m.chat, `✅ Nivel de acceso actualizado.\nRol: ${roleId}\nPlugin: ${pluginId}\nNuevo nivel: ${level}`, m, ctxOk)
+        return await conn.reply(m.chat, `✅ Nivel de acceso actualizado.\nRol: ${roleId}\nPlugin: ${pluginId}\nNuevo nivel: ${level}`, m, ctxOk)
+      } catch (errFile) {
+        console.error('setpluginrole file error:', errFile)
+        return await conn.reply(m.chat, `✘ Error al actualizar roles.json: ${errFile.message}`, m, ctxErr)
+      }
     }
 
     return null
-
   } catch (e) {
     console.error('Roles Manager error:', e)
-    await conn.reply(m.chat, `❌ Error en Roles Manager\n\n${e.message}`, m, ctxErr)
+    await conn.reply(m.chat, `❌ Error en Roles Manager\n\n${e.message || String(e)}`, m, ctxErr)
   }
 }
 
-handler.help = ['rolesmenu','whois','setrole','addrole','removerole','roleinfo','setpluginrole']
+handler.help = ['rolesmenu', 'whois', 'setrole', 'addrole', 'removerole', 'roleinfo', 'setpluginrole']
 handler.tags = ['roles']
-handler.command = ['rolesmenu','whois','setrole','addrole','removerole','roleinfo','setpluginrole']
+handler.command = ['rolesmenu', 'whois', 'setrole', 'addrole', 'removerole', 'roleinfo', 'setpluginrole']
 
 export default handler
