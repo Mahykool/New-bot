@@ -24,7 +24,7 @@ let handler = async (m, { conn, usedPrefix: _p }) => {
       '*ECONOMÍA*': ['economy', 'rpgnk'],
       '*GRUPOS*': ['group'],
       '*DESCARGAS*': ['downloader'],
-      '*MULTIMEDIA*': ['sticker', 'audio', 'anime'],
+      '*MULTIMEDIA*': ['multimedia'],
       '*TOOLS*': ['tools', 'advanced'],
       '*BÚSQUEDA*': ['search', 'buscador'],
       '*ROLES*': ['roles'],
