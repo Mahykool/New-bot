@@ -3,6 +3,7 @@
     "name": "CREADOR",
     "icon": "👑",
     "description": "Control total del sistema",
+    "roleLevel": "full",
     "globalPermissions": [
       "MANAGE_ROLES",
       "USE_ALL_PLUGINS"
@@ -13,6 +14,7 @@
     "name": "MOD",
     "icon": "🛡️",
     "description": "Moderación y soporte avanzado",
+    "roleLevel": "manage",
     "globalPermissions": [
       "MODERATE_GROUPS"
     ]
@@ -22,6 +24,7 @@
     "name": "VIP+",
     "icon": "🔥",
     "description": "Usuario élite con beneficios superiores",
+    "roleLevel": "vip_plus",
     "globalPermissions": []
   },
 
@@ -29,6 +32,7 @@
     "name": "VIP",
     "icon": "💎",
     "description": "Usuario distinguido con beneficios especiales",
+    "roleLevel": "vip",
     "globalPermissions": []
   },
 
@@ -36,6 +40,7 @@
     "name": "USER",
     "icon": "🔹",
     "description": "Usuario estándar",
+    "roleLevel": "basic",
     "globalPermissions": []
   }
 }
