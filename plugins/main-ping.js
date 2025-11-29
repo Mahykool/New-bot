@@ -1,5 +1,5 @@
 // plugins/main-ping.js
-import { getUserRoles } from '../lib/lib-roles.js'
+import { requireCommandAccess } from '../lib/permissions-middleware.js'
 
 let handler = async (m, { conn }) => {
   const ctxErr = (global.rcanalx || {})
@@ -8,100 +8,72 @@ let handler = async (m, { conn }) => {
   const ctxht = (global.rcanal08 || {})
 
   try {
-    // ---------- Control de acceso: solo staff (mod), owner y roowner ----------
-    const userJid = m.sender
-    const roles = getUserRoles(userJid) || []
-
-    // roowner en config.js (fallback) — si lo tienes definido en config.js
-    const isRoOwner = Array.isArray(global.roowner) && global.roowner.includes(userJid)
-
-    const isOwner = roles.includes('owner') || isRoOwner
-    const isStaff = roles.includes('staff') // 'staff' es el id unificado para mod
-
-    if (!(isOwner || isStaff)) {
-      return await conn.reply(
-        m.chat,
-        '✘ *SW SYSTEM — Acceso denegado*\n\n' +
-        'Este comando solo está disponible para STAFF (mod) y OWNER.\n' +
-        'Si crees que deberías tener acceso, contacta con el OWNER.',
-        m,
-        ctxWarn
-      )
-    }
+    // ---------- Control de acceso con el nuevo sistema ----------
+    // pluginId: "main-ping"
+    // command:  "ping"
+    requireCommandAccess(m.sender, 'main-ping', 'ping')
     // ---------- Fin control de acceso ----------
 
-    // Tiempo inicial
     const start = Date.now()
 
-    // Mensaje inicial estilo SW SYSTEM
     await conn.reply(
       m.chat,
-      '🕶️🏁 *SW SYSTEM — Analizando latencia...*\n\n⌛ *Procesando datos del sistema...*',
+      'ஓீ🐙 ㅤׄㅤׅㅤׄ *DIAGNOSTICO* ㅤ֢ㅤׄㅤׅ\n\n⌛ *Iniciando revisión de latencia...*',
       m,
       ctxOk
     )
 
-    // Tiempo final
     const end = Date.now()
-
-    // Calcular ping REAL
     const ping = end - start
 
-    // Evaluación estilo GTA SA
     let speed, emoji, status
     if (ping < 100) {
-      speed = '*🚨 Velocidad Criminal*'
+      speed = '*🚨 MODO CRIMINAL*'
       emoji = '💥'
-      status = 'Excelente'
+      status = 'Rendimiento excelente'
     } else if (ping < 300) {
-      speed = '*⚡ Rápido como Grove Street*'
+      speed = '*⚡ GROVE STREET SPEED*'
       emoji = '⚡'
-      status = 'Óptimo'
+      status = 'Rendimiento óptimo'
     } else if (ping < 600) {
-      speed = '*🏁 Estable*'
+      speed = '*🏁 FLUJO ESTABLE*'
       emoji = '🏁'
-      status = 'Bueno'
+      status = 'Rendimiento bueno'
     } else if (ping < 1000) {
-      speed = '*📡 Regular*'
+      speed = '*📡 SESIÓN CARGADA*'
       emoji = '📡'
-      status = 'Normal'
+      status = 'Rendimiento normal'
     } else {
-      speed = '*🐢 Lento*'
+      speed = '*🐢 MODO TORTUGA*'
       emoji = '🐢'
-      status = 'Bajo'
+      status = 'Rendimiento bajo'
     }
 
-    // Uso de memoria
     const used = process.memoryUsage()
     const memory = Math.round(used.rss / 1024 / 1024) + ' MB'
 
-    // Uptime
     const uptime = process.uptime()
     const hours = Math.floor(uptime / 3600)
     const minutes = Math.floor((uptime % 3600) / 60)
     const seconds = Math.floor(uptime % 60)
     const uptimeString = `${hours}h ${minutes}m ${seconds}s`
 
-    // Info del sistema
     const platform = process.platform
     const arch = process.arch
     const nodeVersion = process.version
 
-    // Mensaje final estilo SW SYSTEM
     const pingMessage = `
-🕶️ **SW SYSTEM — Diagnóstico del Sistema** 🏁
+ஓீ🐙 ㅤׄㅤׅㅤׄ *DIAGNOSTICO* ㅤ֢ㅤׄㅤׅ
 
 ${emoji} *Latencia:* ${ping} ms
-📡 *Conexión:* ${speed}
-✅ *Estado:* ${status}
+📡 *Perfil de conexión:* ${speed}
+✅ *Estado general:* ${status}
 
-💾 *Memoria:* ${memory}
-⏱️ *Uptime:* ${uptimeString}
+💾 *Memoria en uso:* ${memory}
+⏱️ *Tiempo activo:* ${uptimeString}
 🖥️ *Plataforma:* ${platform}
 🔧 *Arquitectura:* ${arch}
 📦 *Node.js:* ${nodeVersion}
-
-🎮 *"Todo bien, todo correcto. SW SYSTEM operativo."*
     `.trim()
 
     await conn.reply(m.chat, pingMessage, m, ctxOk)
@@ -110,14 +82,15 @@ ${emoji} *Latencia:* ${ping} ms
     console.error('Error en ping:', error)
     await conn.reply(
       m.chat,
-      `❌ *SW SYSTEM — Error en el diagnóstico*\n\n` +
-      `🔧 *Detalles:* ${error.message}`,
+      `❌ *Error en el diagnóstico*\n\n` +
+      `🔧 *Detalle técnico:* ${error.message}`,
       m,
       ctxErr
     )
   }
 }
 
+handler.pluginId = 'main-ping'
 handler.help = ['ping']
 handler.tags = ['main']
 handler.command = ['p', 'ping']
