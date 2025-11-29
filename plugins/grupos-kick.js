@@ -101,10 +101,9 @@ const handler = async (m, { conn, participants, usedPrefix, command }) => {
 }
 
 handler.pluginId = 'group-kick'
-handler.command = ['kick', 'echar', 'hechar', 'sacar', 'ban']
-handler.help = ['kick @usuario']
-handler.tags = ['group']
-
+handler.help = ['kick', 'echar', 'hechar', 'sacar', 'ban', 'fuistee', 'chaoo', 'eraas', 'techingee']
+handler.tags = ['modmenu']
+handler.command = ['kick', 'echar', 'hechar', 'sacar', 'ban', 'fuistee', 'chaoo', 'eraas', 'techingee']
 handler.group = true
 handler.botAdmin = true
 
