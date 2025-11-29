@@ -1,239 +1,362 @@
 // plugins/roles-management.js
-// SW SYSTEM — Roles Manager (gestión de roles desde WhatsApp)
+// SW SYSTEM — Roles Manager (versión final optimizada)
 
 import {
   getRolesConfig,
   saveRolesConfig,
   getUserRoles,
+  getUserRolesMap,
   setUserRole,
   addUserRole,
   removeUserRole,
   getRoleInfo,
   normalizeRoleId,
-  normalizeJid
+  normalizeJid,
+  saveUserRolesMap,
+  reloadRoles,
+  roleExists,
+  listRoles
 } from '../lib/lib-roles.js'
 
-import { hasPermission } from '../lib/permissions-middleware.js'
+import { requireCommandAccess } from '../lib/permissions-middleware.js'
 
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
+// ------------------------------
+// Helpers
+// ------------------------------
+function parseTarget(m, args = []) {
+  if (Array.isArray(m.mentionedJid) && m.mentionedJid.length > 0)
+    return normalizeJid(m.mentionedJid[0])
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-const PROJECT_ROOT = process.cwd()
-const ROLES_PATH = path.join(PROJECT_ROOT, 'lib', 'roles.json')
+  if (m.quoted) {
+    const q = m.quoted
+    const cand = q.sender || q.participant || q.key?.participant || q.key?.remoteJid
+    if (cand) return normalizeJid(cand)
+  }
 
-let handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) => {
-  const ctxErr = (global.rcanalx || {})
-  const ctxWarn = (global.rcanalw || {})
-  const ctxOk = (global.rcanalr || {})
+  for (const a of args) {
+    if (!a) continue
+    const raw = String(a).replace(/[^\d@.+]/g, '')
+    if (!raw) continue
+    return normalizeJid(raw.includes('@') ? raw : raw)
+  }
 
-  try {
-    // Permiso requerido para administrar roles
-    if (!hasPermission(m.sender, 'MANAGE_ROLES')) {
-      return await conn.reply(m.chat, '✘ No tienes permisos para administrar roles.', m, ctxWarn)
-    }
+  return null
+}
 
-    const rolesConfig = typeof getRolesConfig === 'function' ? getRolesConfig() : {}
-    const cmd = (command || '').toLowerCase()
+function extractRoleArg(args = []) {
+  for (const a of args) {
+    if (!a || a.startsWith('@') || /^@\d+/.test(a)) continue
+    return normalizeRoleId(a)
+  }
+  return normalizeRoleId(args[args.length - 1] || '')
+}
 
-    // Helper: obtener rol desde args (ignora menciones @)
-    const extractRoleArg = (arr) => {
-      if (!Array.isArray(arr)) return ''
-      // buscar primer token que no empiece por @ y no sea una mención
-      for (const a of arr) {
-        if (!a) continue
-        if (a.startsWith('@')) continue
-        // si es una mención con formato @1234, saltar
-        if (/^@\d+/.test(a)) continue
-        return a
-      }
-      // fallback: último token
-      return arr[arr.length - 1] || ''
-    }
+const format = txt => `*ROLES* — ${txt}`
 
-    // rolesmenu
-    if (cmd === 'rolesmenu') {
-      handler.pluginId = 'rolesmenu'
-      const info = getRoleInfo(m.sender) || { icon: '', name: 'Usuario' }
-      const userRoles = (getUserRoles(m.sender) || []).join(', ') || 'ninguno'
-      const rolesList = Object.keys(rolesConfig).map(r => `${r} — ${rolesConfig[r].name || r}`).join('\n') || 'ninguno'
+// ------------------------------
+// Handler principal
+// ------------------------------
+const handler = async (m, { conn, command, args, usedPrefix }) => {
+  const cmd = (command || '').toLowerCase()
+  const ctxErr = global.rcanalx || {}
+  const ctxWarn = global.rcanalw || {}
+  const ctxOk = global.rcanalr || {}
 
-      const text = `
-ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ
+  const rolesConfig = getRolesConfig()
+  const validLevels = ['none', 'basic', 'manage', 'full']
 
-👤 Tu rol principal: ${info.icon || ''} ${info.name || 'Usuario'}
-🔹 Roles asignados: ${userRoles}
+  // ------------------------------
+  // ✅ MENÚ PRINCIPAL — .rolmenu
+  // ------------------------------
+  if (cmd === 'rolmenu') {
+    const info = getRoleInfo(m.sender)
+    const userRoles = getUserRoles(m.sender).join(', ') || 'none'
+    const available = Object.keys(rolesConfig)
+      .map(r => `${r} — ${rolesConfig[r].name}`)
+      .join('\n')
 
-Roles disponibles:
-${rolesList}
+    const text = `
+🐙 *MENÚ DE ROLES — SW SYSTEM*
 
-Comandos:
-${usedPrefix}rolesmenu
-${usedPrefix}whois @usuario
-${usedPrefix}setrole @usuario ROL
-${usedPrefix}addrole @usuario ROL
-${usedPrefix}removerole @usuario ROL
-${usedPrefix}roleinfo ROL
-${usedPrefix}setpluginrole ROL pluginId nivel
+👤 *Tu rol principal:* ${info.icon} ${info.name}
+🔹 *Roles asignados:* ${userRoles}
+
+━━━━━━━━━━━━━━━━━━
+📌 *COMANDOS PARA USUARIOS*
+(No requieren permisos especiales)
+
+${usedPrefix}rolmenu  
+→ Muestra este menú con toda la información de roles.
+
+${usedPrefix}whois @usuario  
+→ Muestra el rol principal y los roles asignados de un usuario.
+
+${usedPrefix}roleinfo <rol>  
+→ Muestra información detallada sobre un rol específico.
+
+${usedPrefix}grouproles  
+→ Muestra los roles de todos los integrantes del grupo.
+
+━━━━━━━━━━━━━━━━━━
+🛡️ *COMANDOS DE MODERACIÓN*
+(Los permisos se administran en plugin-permissions.json)
+
+${usedPrefix}setrole @usuario <rol>  
+→ Establece un rol principal para el usuario (reemplaza todos los roles anteriores).
+
+${usedPrefix}addrole @usuario <rol>  
+→ Agrega un rol adicional al usuario sin eliminar los existentes.
+
+${usedPrefix}removerole @usuario <rol>  
+→ Elimina un rol específico del usuario.
+
+${usedPrefix}setpluginrole <rol> <pluginId> <nivel>  
+→ Configura el nivel de acceso de un rol para un plugin específico.
+
+${usedPrefix}role reload  
+→ Recarga todos los roles desde los archivos del sistema.
+
+${usedPrefix}role list @usuario  
+→ Muestra todos los roles asignados a un usuario.
+
+${usedPrefix}role roles  
+→ Lista todos los roles disponibles en el sistema.
+
+━━━━━━━━━━━━━━━━━━
+📚 *Roles disponibles:*
+${available}
 `.trim()
 
-      return await conn.reply(m.chat, text, m, ctxOk)
-    }
+    return conn.reply(m.chat, text, m, ctxOk)
+  }
 
-    // whois
-    if (cmd === 'whois') {
-      handler.pluginId = 'whois'
-      if (!m.mentionedJid || !m.mentionedJid[0]) {
-        return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}whois @usuario`, m, ctxWarn)
-      }
-      const target = normalizeJid(m.mentionedJid[0])
-      const info = getRoleInfo(target) || { icon: '', name: 'Usuario' }
-      const roles = (getUserRoles(target) || []).join(', ') || 'ninguno'
+  // ------------------------------
+  // ✅ WHOIS (usuario)
+  // ------------------------------
+  if (cmd === 'whois') {
+    const target = parseTarget(m, args)
+    if (!target)
+      return conn.reply(m.chat, format('Debes mencionar o responder a un usuario.'), m, ctxWarn)
 
-      const text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ
+    const info = getRoleInfo(target)
+    const roles = getUserRoles(target).join(', ') || 'none'
 
+    const text = `
 👤 Usuario: ${target}
-👑 Rol principal: ${info.icon || ''} ${info.name || 'Usuario'}
-🔹 Roles asignados: ${roles}`.trim()
+👑 Rol principal: ${info.icon} ${info.name}
+🔹 Roles asignados: ${roles}
+`.trim()
 
-      return await conn.reply(m.chat, text, m, ctxOk)
-    }
+    return conn.reply(m.chat, format(text), m, ctxOk)
+  }
 
-    // setrole
-    if (cmd === 'setrole') {
-      handler.pluginId = 'setrole'
-      if (!m.mentionedJid || !m.mentionedJid[0]) {
-        return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}setrole @usuario staff`, m, ctxWarn)
-      }
-      const target = normalizeJid(m.mentionedJid[0])
-      // role puede venir en args[0] o args[1] dependiendo del parser; usamos helper
-      const rawRole = extractRoleArg(args) || ''
-      const roleId = normalizeRoleId(rawRole)
+  // ------------------------------
+  // ✅ ROLEINFO (usuario)
+  // ------------------------------
+  if (cmd === 'roleinfo') {
+    const roleId = extractRoleArg(args)
+    if (!roleExists(roleId))
+      return conn.reply(m.chat, format('Rol inválido. Usa .rolmenu para ver la lista.'), m, ctxWarn)
 
-      if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
-        return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
-      }
+    const role = rolesConfig[roleId]
+    const perms = (role.globalPermissions || []).join(', ') || 'none'
+    const plugins = Object.entries(role.pluginPermissions || {})
+      .map(([p, lvl]) => `- ${p}: ${lvl}`)
+      .join('\n') || 'none'
 
-      const newRoles = setUserRole(target, roleId) || []
-      return await conn.reply(m.chat, `✅ Rol principal actualizado.\nUsuario: ${target}\nRoles actuales: ${newRoles.join(', ')}`, m, ctxOk)
-    }
-
-    // addrole
-    if (cmd === 'addrole') {
-      handler.pluginId = 'addrole'
-      if (!m.mentionedJid || !m.mentionedJid[0]) {
-        return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}addrole @usuario staff`, m, ctxWarn)
-      }
-      const target = normalizeJid(m.mentionedJid[0])
-      const rawRole = extractRoleArg(args) || ''
-      const roleId = normalizeRoleId(rawRole)
-
-      if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
-        return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
-      }
-
-      const newRoles = addUserRole(target, roleId) || []
-      return await conn.reply(m.chat, `✅ Rol agregado.\nUsuario: ${target}\nRoles actuales: ${newRoles.join(', ')}`, m, ctxOk)
-    }
-
-    // removerole
-    if (cmd === 'removerole') {
-      handler.pluginId = 'removerole'
-      if (!m.mentionedJid || !m.mentionedJid[0]) {
-        return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}removerole @usuario staff`, m, ctxWarn)
-      }
-      const target = normalizeJid(m.mentionedJid[0])
-      const rawRole = extractRoleArg(args) || ''
-      const roleId = normalizeRoleId(rawRole)
-
-      const newRoles = removeUserRole(target, roleId) || []
-      return await conn.reply(m.chat, `✅ Rol removido.\nUsuario: ${target}\nRoles actuales: ${newRoles.join(', ')}`, m, ctxOk)
-    }
-
-    // roleinfo
-    if (cmd === 'roleinfo') {
-      handler.pluginId = 'roleinfo'
-      const raw = (args[0] || '').toLowerCase()
-      const roleId = normalizeRoleId(raw)
-
-      if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
-        return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
-      }
-
-      const role = rolesConfig[roleId] || {}
-      let text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ
-
+    const text = `
 ID: ${roleId}
-Nombre: ${role.name || roleId}
-Icono: ${role.icon || ''}
-Descripción: ${role.description || 'ninguna'}
+Nombre: ${role.name}
+Icono: ${role.icon}
+Descripción: ${role.description}
 
-Permisos globales: ${(role.globalPermissions || []).join(', ') || 'ninguno'}
+Permisos globales: ${perms}
 
 Plugins:
+${plugins}
 `.trim()
 
-      for (const p in (role.pluginPermissions || {})) {
-        text += `\n- ${p}: ${role.pluginPermissions[p]}`
-      }
+    return conn.reply(m.chat, format(text), m, ctxOk)
+  }
 
-      return await conn.reply(m.chat, text, m, ctxOk)
+  // ------------------------------
+  // ✅ GROUPOLES — lista roles del grupo
+  // ------------------------------
+  if (cmd === 'grouproles') {
+    if (!m.isGroup)
+      return conn.reply(m.chat, format('Este comando solo funciona en grupos.'), m, ctxWarn)
+
+    const group = await conn.groupMetadata(m.chat)
+    const participants = group.participants || []
+
+    let text = `👥 *ROLES DEL GRUPO*\n\n`
+
+    for (const p of participants) {
+      const jid = normalizeJid(p.id)
+      const roles = getUserRoles(jid).join(', ') || 'user'
+      text += `@${jid.split('@')[0]} — ${roles}\n`
     }
 
-    // setpluginrole
-    if (cmd === 'setpluginrole') {
-      handler.pluginId = 'setpluginrole'
-      // formato esperado: setpluginrole ROL pluginId nivel
-      const rawRole = (args[0] || '').toLowerCase()
-      const roleId = normalizeRoleId(rawRole)
-      const pluginId = (args[1] || '').toLowerCase()
-      const level = (args[2] || '').toLowerCase()
-      const validLevels = ['none', 'basic', 'manage', 'full']
+    return conn.reply(m.chat, text.trim(), m, {
+      mentions: participants.map(p => p.id)
+    })
+  }
 
-      if (!roleId || !rolesConfig[roleId]) {
-        const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
-        return await conn.reply(m.chat, `✘ Rol inválido.\nRoles disponibles: ${available}`, m, ctxWarn)
-      }
+  // ------------------------------
+  // ✅ COMANDOS DE MODERACIÓN
+  // (Permisos manejados por plugin-permissions.json)
+  // ------------------------------
 
-      if (!pluginId) {
-        return await conn.reply(m.chat, `✘ Debes indicar el pluginId.\nEjemplo: ${usedPrefix}setpluginrole staff ping manage`, m, ctxWarn)
-      }
+  // ✅ SETROLE
+  if (cmd === 'setrole') {
+    requireCommandAccess(m.sender, 'roles-management', 'setrole')
 
-      if (!validLevels.includes(level)) {
-        return await conn.reply(m.chat, `✘ Nivel inválido.\nNiveles válidos: ${validLevels.join(', ')}`, m, ctxWarn)
-      }
+    const target = parseTarget(m, args)
+    const roleId = extractRoleArg(args)
 
-      try {
-        // Usar la función centralizada para guardar
-        const rolesData = getRolesConfig()
-        rolesData[roleId] = rolesData[roleId] || {}
-        rolesData[roleId].pluginPermissions = rolesData[roleId].pluginPermissions || {}
-        rolesData[roleId].pluginPermissions[pluginId] = level
+    if (!target || !roleExists(roleId))
+      return conn.reply(m.chat, format('Uso: .setrole @usuario <rol>'), m, ctxWarn)
 
-        // Guardar mediante la función centralizada
-        saveRolesConfig(rolesData)
+    const updated = setUserRole(target, roleId)
+    try { global.userRoles = getUserRolesMap() } catch {}
 
-        return await conn.reply(m.chat, `✅ Nivel de acceso actualizado.\nRol: ${roleId}\nPlugin: ${pluginId}\nNuevo nivel: ${level}`, m, ctxOk)
-      } catch (errFile) {
-        console.error('setpluginrole file error:', errFile)
-        return await conn.reply(m.chat, `✘ Error al actualizar roles.json: ${errFile.message}`, m, ctxErr)
-      }
-    }
+    return conn.reply(
+      m.chat,
+      format(`Rol principal actualizado.\nUsuario: ${target}\nRoles: ${updated.join(', ')}`),
+      m,
+      ctxOk
+    )
+  }
 
-    return null
-  } catch (e) {
-    console.error('Roles Manager error:', e)
-    await conn.reply(m.chat, `❌ Error en Roles Manager\n\n${e.message || String(e)}`, m, ctxErr)
+  // ✅ ADDROLE
+  if (cmd === 'addrole') {
+    requireCommandAccess(m.sender, 'roles-management', 'addrole')
+
+    const target = parseTarget(m, args)
+    const roleId = extractRoleArg(args)
+
+    if (!target || !roleExists(roleId))
+      return conn.reply(m.chat, format('Uso: .addrole @usuario <rol>'), m, ctxWarn)
+
+    const updated = addUserRole(target, roleId)
+    try { global.userRoles = getUserRolesMap() } catch {}
+
+    return conn.reply(
+      m.chat,
+      format(`Rol agregado.\nUsuario: ${target}\nRoles: ${updated.join(', ')}`),
+      m,
+      ctxOk
+    )
+  }
+
+  // ✅ REMOVEROLE
+  if (cmd === 'removerole') {
+    requireCommandAccess(m.sender, 'roles-management', 'removerole')
+
+    const target = parseTarget(m, args)
+    const roleId = extractRoleArg(args)
+
+    if (!target || !roleExists(roleId))
+      return conn.reply(m.chat, format('Uso: .removerole @usuario <rol>'), m, ctxWarn)
+
+    const updated = removeUserRole(target, roleId)
+    try { global.userRoles = getUserRolesMap() } catch {}
+
+    return conn.reply(
+      m.chat,
+      format(`Rol removido.\nUsuario: ${target}\nRoles: ${updated.join(', ')}`),
+      m,
+      ctxOk
+    )
+  }
+
+  // ✅ SETPLUGINROLE
+  if (cmd === 'setpluginrole') {
+    requireCommandAccess(m.sender, 'roles-management', 'setpluginrole')
+
+    const roleId = normalizeRoleId(args[0] || '')
+    const pluginId = (args[1] || '').toLowerCase()
+    const level = (args[2] || '').toLowerCase()
+
+    if (!roleExists(roleId))
+      return conn.reply(m.chat, format('Rol inválido.'), m, ctxWarn)
+
+    if (!pluginId)
+      return conn.reply(m.chat, format('Debes indicar pluginId.'), m, ctxWarn)
+
+    if (!validLevels.includes(level))
+      return conn.reply(m.chat, format('Nivel inválido.'), m, ctxWarn)
+
+    rolesConfig[roleId].pluginPermissions =
+      rolesConfig[roleId].pluginPermissions || {}
+
+    rolesConfig[roleId].pluginPermissions[pluginId] = level
+
+    saveRolesConfig(rolesConfig)
+    reloadRoles()
+
+    return conn.reply(
+      m.chat,
+      format(`Nivel actualizado.\nRol: ${roleId}\nPlugin: ${pluginId}\nNivel: ${level}`),
+      m,
+      ctxOk
+    )
+  }
+
+  // ✅ role reload
+  if (cmd === 'role' && args[0] === 'reload') {
+    requireCommandAccess(m.sender, 'roles-management', 'role-reload')
+
+    reloadRoles()
+    try { global.userRoles = getUserRolesMap() } catch {}
+
+    return conn.reply(m.chat, format('Roles recargados desde disco.'), m, ctxOk)
+  }
+
+  // ✅ role list
+  if (cmd === 'role' && args[0] === 'list') {
+    requireCommandAccess(m.sender, 'roles-management', 'role-list')
+
+    const target = parseTarget(m, args.slice(1))
+    if (!target)
+      return conn.reply(m.chat, format('Uso: .role list @usuario'), m, ctxWarn)
+
+    const roles = getUserRoles(target)
+    const info = getRoleInfo(target)
+
+    const text = `
+Usuario: ${target}
+Roles: ${roles.join(', ')}
+Principal: ${info.name || info.id}
+`.trim()
+
+    return conn.reply(m.chat, format(text), m, ctxOk)
+  }
+
+  // ✅ role roles
+  if (cmd === 'role' && args[0] === 'roles') {
+    requireCommandAccess(m.sender, 'roles-management', 'role-roles')
+
+    const available = listRoles().join(', ')
+    return conn.reply(m.chat, format(`Roles disponibles: ${available}`), m, ctxOk)
   }
 }
 
-handler.help = ['rolesmenu', 'whois', 'setrole', 'addrole', 'removerole', 'roleinfo', 'setpluginrole']
+// ------------------------------
+// Registro de comandos
+// ------------------------------
+handler.help = ['rolmenu']
 handler.tags = ['roles']
-handler.command = ['rolesmenu', 'whois', 'setrole', 'addrole', 'removerole', 'roleinfo', 'setpluginrole']
+handler.command = [
+  'rolmenu',
+  'whois',
+  'roleinfo',
+  'grouproles',
+  'setrole',
+  'addrole',
+  'removerole',
+  'setpluginrole',
+  'role'
+]
 
 export default handler
