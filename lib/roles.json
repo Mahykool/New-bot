@@ -6,10 +6,7 @@
     "globalPermissions": [
       "MANAGE_ROLES",
       "USE_ALL_PLUGINS"
-    ],
-    "pluginPermissions": {
-      "*": "full"
-    }
+    ]
   },
 
   "mod": {
@@ -18,55 +15,27 @@
     "description": "Moderación y soporte avanzado",
     "globalPermissions": [
       "MODERATE_GROUPS"
-    ],
-    "pluginPermissions": {
-      "rolesmenu": "manage",
-      "setrole": "manage",
-      "addrole": "manage",
-      "removerole": "manage",
-      "welcome": "manage",
-      "antilink": "manage"
-    }
+    ]
   },
 
   "vip_plus": {
     "name": "VIP+",
-    "icon": "💎",
+    "icon": "🔥",
     "description": "Usuario élite con beneficios superiores",
-    "globalPermissions": [],
-    "pluginPermissions": {
-      "main-menu": "basic",
-      "welcome": "basic",
-      "whois": "basic",
-      "roleinfo": "basic",
-      "ping": "basic"
-    }
+    "globalPermissions": []
   },
 
   "vip": {
     "name": "VIP",
-    "icon": "🔥",
+    "icon": "💎",
     "description": "Usuario distinguido con beneficios especiales",
-    "globalPermissions": [],
-    "pluginPermissions": {
-      "main-menu": "basic",
-      "welcome": "basic",
-      "whois": "basic",
-      "roleinfo": "basic",
-      "ping": "basic"
-    }
+    "globalPermissions": []
   },
 
   "user": {
     "name": "USER",
     "icon": "🔹",
     "description": "Usuario estándar",
-    "globalPermissions": [],
-    "pluginPermissions": {
-      "main-menu": "basic",
-      "welcome": "basic",
-      "whois": "basic",
-      "roleinfo": "basic"
-    }
+    "globalPermissions": []
   }
 }
