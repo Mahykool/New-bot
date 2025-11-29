@@ -9,7 +9,8 @@ import {
   addUserRole,
   removeUserRole,
   getRoleInfo,
-  normalizeRoleId
+  normalizeRoleId,
+  normalizeJid
 } from '../lib/lib-roles.js'
 
 import { hasPermission } from '../lib/permissions-middleware.js'
@@ -23,7 +24,7 @@ const __dirname = path.dirname(__filename)
 const PROJECT_ROOT = process.cwd()
 const ROLES_PATH = path.join(PROJECT_ROOT, 'lib', 'roles.json')
 
-let handler = async (m, { conn, command, args = [], usedPrefix = '/' }) => {
+let handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) => {
   const ctxErr = (global.rcanalx || {})
   const ctxWarn = (global.rcanalw || {})
   const ctxOk = (global.rcanalr || {})
@@ -34,8 +35,23 @@ let handler = async (m, { conn, command, args = [], usedPrefix = '/' }) => {
       return await conn.reply(m.chat, '✘ No tienes permisos para administrar roles.', m, ctxWarn)
     }
 
-    const rolesConfig = getRolesConfig ? getRolesConfig() : {}
+    const rolesConfig = typeof getRolesConfig === 'function' ? getRolesConfig() : {}
     const cmd = (command || '').toLowerCase()
+
+    // Helper: obtener rol desde args (ignora menciones @)
+    const extractRoleArg = (arr) => {
+      if (!Array.isArray(arr)) return ''
+      // buscar primer token que no empiece por @ y no sea una mención
+      for (const a of arr) {
+        if (!a) continue
+        if (a.startsWith('@')) continue
+        // si es una mención con formato @1234, saltar
+        if (/^@\d+/.test(a)) continue
+        return a
+      }
+      // fallback: último token
+      return arr[arr.length - 1] || ''
+    }
 
     // rolesmenu
     if (cmd === 'rolesmenu') {
@@ -72,16 +88,15 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       if (!m.mentionedJid || !m.mentionedJid[0]) {
         return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}whois @usuario`, m, ctxWarn)
       }
-      const target = m.mentionedJid[0]
+      const target = normalizeJid(m.mentionedJid[0])
       const info = getRoleInfo(target) || { icon: '', name: 'Usuario' }
       const roles = (getUserRoles(target) || []).join(', ') || 'ninguno'
 
-      const text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ`
+      const text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ
 
 👤 Usuario: ${target}
 👑 Rol principal: ${info.icon || ''} ${info.name || 'Usuario'}
-🔹 Roles asignados: ${roles}
-`.trim()
+🔹 Roles asignados: ${roles}`.trim()
 
       return await conn.reply(m.chat, text, m, ctxOk)
     }
@@ -92,9 +107,10 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       if (!m.mentionedJid || !m.mentionedJid[0]) {
         return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}setrole @usuario staff`, m, ctxWarn)
       }
-      const target = m.mentionedJid[0]
-      const raw = (args[1] || '').toLowerCase()
-      const roleId = normalizeRoleId(raw)
+      const target = normalizeJid(m.mentionedJid[0])
+      // role puede venir en args[0] o args[1] dependiendo del parser; usamos helper
+      const rawRole = extractRoleArg(args) || ''
+      const roleId = normalizeRoleId(rawRole)
 
       if (!roleId || !rolesConfig[roleId]) {
         const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
@@ -111,9 +127,9 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       if (!m.mentionedJid || !m.mentionedJid[0]) {
         return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}addrole @usuario staff`, m, ctxWarn)
       }
-      const target = m.mentionedJid[0]
-      const raw = (args[1] || '').toLowerCase()
-      const roleId = normalizeRoleId(raw)
+      const target = normalizeJid(m.mentionedJid[0])
+      const rawRole = extractRoleArg(args) || ''
+      const roleId = normalizeRoleId(rawRole)
 
       if (!roleId || !rolesConfig[roleId]) {
         const available = Object.keys(rolesConfig).join(', ') || 'ninguno'
@@ -130,9 +146,9 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       if (!m.mentionedJid || !m.mentionedJid[0]) {
         return await conn.reply(m.chat, `✘ Debes mencionar a un usuario.\nEjemplo: ${usedPrefix}removerole @usuario staff`, m, ctxWarn)
       }
-      const target = m.mentionedJid[0]
-      const raw = (args[1] || '').toLowerCase()
-      const roleId = normalizeRoleId(raw)
+      const target = normalizeJid(m.mentionedJid[0])
+      const rawRole = extractRoleArg(args) || ''
+      const roleId = normalizeRoleId(rawRole)
 
       const newRoles = removeUserRole(target, roleId) || []
       return await conn.reply(m.chat, `✅ Rol removido.\nUsuario: ${target}\nRoles actuales: ${newRoles.join(', ')}`, m, ctxOk)
@@ -150,14 +166,14 @@ ${usedPrefix}setpluginrole ROL pluginId nivel
       }
 
       const role = rolesConfig[roleId] || {}
-      let text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ`
+      let text = `ஓீ🐙 ㅤׄㅤׅㅤׄ _*ROLES*_ ㅤ֢ㅤׄㅤׅ
 
 ID: ${roleId}
 Nombre: ${role.name || roleId}
 Icono: ${role.icon || ''}
 Descripción: ${role.description || 'ninguna'}
 
-Permisos globales: ${ (role.globalPermissions || []).join(', ') || 'ninguno' }
+Permisos globales: ${(role.globalPermissions || []).join(', ') || 'ninguno'}
 
 Plugins:
 `.trim()
@@ -172,6 +188,7 @@ Plugins:
     // setpluginrole
     if (cmd === 'setpluginrole') {
       handler.pluginId = 'setpluginrole'
+      // formato esperado: setpluginrole ROL pluginId nivel
       const rawRole = (args[0] || '').toLowerCase()
       const roleId = normalizeRoleId(rawRole)
       const pluginId = (args[1] || '').toLowerCase()
@@ -192,6 +209,7 @@ Plugins:
       }
 
       try {
+        // Usar la función centralizada para guardar
         const rolesData = getRolesConfig()
         rolesData[roleId] = rolesData[roleId] || {}
         rolesData[roleId].pluginPermissions = rolesData[roleId].pluginPermissions || {}
