@@ -8,9 +8,7 @@ const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'shadowbans.json')
 
 const TITLE = 'ㅤׄㅤׅㅤׄ _*SHADOWBAN*_ ㅤ֢ㅤׄㅤׅ'
-const GTA_THUMB_1 = process.env.GTA_THUMB_1 || 'https://i.imgur.com/ejemploGTA1.jpg'
-const GTA_THUMB_2 = process.env.GTA_THUMB_2 || 'https://i.imgur.com/ejemploGTA2.jpg'
-const DEFAULT_GTA_THUMB = GTA_THUMB_1
+const DEFAULT_GTA_THUMB = process.env.GTA_THUMB_1 || 'https://i.imgur.com/ejemploGTA1.jpg'
 
 function ensureDataDir() {
   try { fs.mkdirSync(DATA_DIR, { recursive: true }) } catch {}
@@ -63,63 +61,31 @@ function formatTitle() {
 }
 
 function msgCreatorAttemptPublic() {
-  return `${formatTitle()}
-*En serio intentaste shadowbanear al creador?* 💀
-
-No lo intentes de nuevo.`
+  return `${formatTitle()}*En serio intentaste shadowbanear al creador?* 💀\n\nNo lo intentes de nuevo.`
 }
 
 function msgCreatorPunishPublic(punisherShort) {
-  return `${formatTitle()}
-✅ CASTIGO APLICADO
-
-Has sido shadowbaneado por intentar shadowbanear al creador.
-Duración: *5 minutos* — *INMUTABLE*
-Responsable: @${punisherShort}`
+  return `${formatTitle()}✅ CASTIGO APLICADO\n\nHas sido shadowbaneado por intentar shadowbanear al creador.\nDuración: *5 minutos* — *INMUTABLE*\nResponsable: @${punisherShort}`
 }
 
 function msgCreatorPunishDM() {
-  return `${formatTitle()}
-ATENCIÓN
-
-Has sido automáticamente shadowbaneado por intentar shadowbanear al creador.
-Duración: 5 minutos (temporal)
-Estado: INMUTABLE — no puede retirarse manualmente.`
+  return `${formatTitle()}ATENCIÓN\n\nHas sido automáticamente shadowbaneado por intentar shadowbanear al creador.\nDuración: 5 minutos (INMUTABLE).`
 }
 
 function msgShadowbanTemp(minutes, targetShort) {
-  return `${formatTitle()}
-✨ SHADOWBAN TEMPORAL
-
-Usuario: @${targetShort}
-Duración: ${minutes} minuto(s)
-
-Te avisaré cuando termine.`
+  return `${formatTitle()}✨ SHADOWBAN TEMPORAL\n\nUsuario: @${targetShort}\nDuración: ${minutes} minuto(s)\n\nTe avisaré cuando termine.`
 }
 
 function msgShadowbanPerm(targetShort) {
-  return `${formatTitle()}
-🔒 SHADOWBAN PERMANENTE
-
-Usuario: @${targetShort}
-Hasta que se ejecute unshadowban.`
+  return `${formatTitle()}🔒 SHADOWBAN PERMANENTE\n\nUsuario: @${targetShort}\nHasta que se ejecute unshadowban.`
 }
 
 function msgShadowbanExpired(targetShort) {
-  return `${formatTitle()}
-🎉 SHADOWBAN TERMINADO
-
-El shadowban temporal de @${targetShort} ha finalizado.`
+  return `${formatTitle()}🎉 SHADOWBAN TERMINADO\n\nEl shadowban temporal de @${targetShort} ha finalizado.`
 }
 
 function msgUsage() {
-  return `${formatTitle()}
-USO
-
-1) Shadowban indefinido — Responde y escribe: *shadowban*
-2) Shadowban temporal — Responde y escribe: *shadowban <minutos>* (ej. *shadowban 30*)
-
-Comandos: unshadowban, mute, unmute`
+  return `${formatTitle()}USO\n\n1) Shadowban indefinido — Responde y escribe: *shadowban*\n2) Shadowban temporal — Responde y escribe: *shadowban <minutos>* (ej. *shadowban 30*)\n\nComandos: unshadowban, mute, unmute`
 }
 
 function scheduleUnshadow(jid, ms, conn = null) {
@@ -169,33 +135,58 @@ function scheduleAllTimeouts() {
 
 loadShadowbansFromDisk()
 
+function extractTargetJid(m) {
+  try {
+    if (m.quoted) {
+      const q = m.quoted
+      const candidate =
+        q.sender ||
+        q.participant ||
+        q.key?.participant ||
+        q.key?.remoteJid ||
+        (q.key?.fromMe && (q.key?.participant || q.key?.remoteJid)) ||
+        null
+      if (candidate) return normalizeJid(candidate)
+    }
+
+    if (Array.isArray(m.mentionedJid) && m.mentionedJid.length > 0) {
+      return normalizeJid(m.mentionedJid[0])
+    }
+
+    const text = (m.text || m.caption || '') + ''
+    const match = text.match(/@?(\+?\d{6,15})/g)
+    if (match && match.length > 0) {
+      const raw = match[0].replace('@', '').replace('+', '')
+      return normalizeJid(raw + '@s.whatsapp.net')
+    }
+
+    return null
+  } catch (e) {
+    console.warn('extractTargetJid error', e)
+    return null
+  }
+}
+
 const handler = async (m, { conn, usedPrefix, command }) => {
   const ctxErr = global.rcanalx || {}
   const ctxWarn = global.rcanalw || {}
   const ctxOk = global.rcanalr || {}
 
-  // 1) Permisos por roles: si no tiene permiso, se deniega
   try {
     requireCommandAccess(m.sender, 'moderation-plugin', 'shadowban')
   } catch (err) {
     return conn.reply(m.chat, `${formatTitle()}\n❌ No tienes permiso para usar este comando.`, m, ctxErr)
   }
 
-  // 2) Mostrar uso (opcional)
   try {
     await conn.reply(m.chat, msgUsage(), m, ctxWarn)
-  } catch (e) {
-    // ignore
+  } catch (e) {}
+
+  const target = extractTargetJid(m)
+  if (!target) {
+    return conn.reply(m.chat, `${formatTitle()}\n‼️ Responde al mensaje del usuario o menciónalo para aplicar shadowban/unshadowban.`, m, ctxWarn)
   }
 
-  // 3) Debe responder a un mensaje objetivo
-  if (!m.quoted) {
-    return conn.reply(m.chat, `${formatTitle()}\n‼️ Responde al mensaje del usuario que quieres shadowbanear/unshadowbanear.`, m, ctxWarn)
-  }
-  const rawTarget = m.quoted.sender
-  const target = normalizeJid(rawTarget)
-
-  // 4) Construir lista de creators normalizados
   const creators = []
   if (Array.isArray(global.owner)) creators.push(...global.owner)
   else if (global.owner) creators.push(global.owner)
@@ -213,14 +204,28 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     })
     .filter(Boolean)
 
-  // 5) Lista de bots del sistema normalizada
+  const userRolesMap = global.userRoles || {}
+  const targetRoles = Array.isArray(userRolesMap[target]) ? userRolesMap[target] : (userRolesMap[target] ? [userRolesMap[target]] : [])
+  const isTargetCreatorByRole = targetRoles.some(r => ['creator', 'owner'].includes(String(r).toLowerCase()))
+
   const allBots = Array.isArray(global.allBots) ? global.allBots.slice() : (Array.isArray(global.botNumbers) ? global.botNumbers.slice() : [])
   const normalizedAllBots = allBots.map(normalizeJid).filter(Boolean)
 
-  // 6) Si intentan shadowbanear al creador -> castigo automático
-  if (normalizedCreators.includes(target)) {
+  const isCreatorTarget = normalizedCreators.includes(target) || isTargetCreatorByRole
+  if (isCreatorTarget) {
     try { await conn.reply(m.chat, msgCreatorAttemptPublic(), m, ctxErr) } catch {}
+
     const punisher = normalizeJid(m.sender)
+
+    if (punisher === target) {
+      try {
+        if (typeof conn.sendMessage === 'function') {
+          await conn.sendMessage(punisher, { text: msgCreatorAttemptPublic() })
+        }
+      } catch (e) {}
+      return
+    }
+
     if (shadowMap.has(punisher)) {
       const existing = shadowMap.get(punisher)
       if (existing.immutable) {
@@ -245,7 +250,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     }
   }
 
-  // 7) No permitir shadowban a bots del sistema
   const botJidRaw = conn.user?.id || conn.user?.jid || null
   const botJid = botJidRaw ? normalizeJid(botJidRaw) : null
   const isSystemBot = (target === botJid) || normalizedAllBots.includes(target)
@@ -253,7 +257,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     return conn.reply(m.chat, `${formatTitle()}\n🤖 No puedes shadowbanear a los bots del sistema. Contacta al creador si hay un problema.`, m, ctxErr)
   }
 
-  // 8) Intento de evitar shadowbanear administradores: comprobación con metadata usando JIDs normalizados
   try {
     const meta = typeof conn.groupMetadata === 'function' ? await conn.groupMetadata(m.chat) : null
     if (meta && Array.isArray(meta.participants)) {
@@ -265,18 +268,14 @@ const handler = async (m, { conn, usedPrefix, command }) => {
         return conn.reply(m.chat, `${formatTitle()}\n❌ No puedes shadowbanear a un administrador.`, m, ctxErr)
       }
     }
-  } catch (e) {
-    // ignoramos errores de metadata
-  }
+  } catch (e) {}
 
-  // 9) Parsear duración
   const text = (m.text || '').trim()
   const parts = text.split(/\s+/).filter(Boolean)
   const durationArg = parts[1] || ''
   const minutes = parseInt(durationArg, 10)
   const isDuration = !isNaN(minutes) && minutes > 0
 
-  // 10) Ejecutar acción
   if (command === 'shadowban' || command === 'mute') {
     if (shadowMap.has(target)) {
       return conn.reply(m.chat, `${formatTitle()}\n⚠️ El usuario ya está shadowbaneado: @${target.split('@')[0]}`, m, { mentions: [target] }, ctxWarn)
@@ -290,7 +289,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     shadowMap.set(target, { expiresAt, timeoutId: null, actor, createdAt, chat: m.chat, immutable: false })
     saveShadowbansToDisk()
 
-    // Si el bot no es admin, avisar que el borrado automático no funcionará
     let botIsAdmin = false
     try {
       const meta = typeof conn.groupMetadata === 'function' ? await conn.groupMetadata(m.chat) : null
@@ -298,12 +296,9 @@ const handler = async (m, { conn, usedPrefix, command }) => {
         const me = meta.participants.find(x => normalizeJid(x.id || x.jid || x.participant) === botJid)
         botIsAdmin = !!(me && (me.admin || me.isAdmin || me.role === 'admin'))
       }
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
 
     if (!botIsAdmin) {
-      // advertencia visible pero no bloqueante
       try {
         await conn.reply(m.chat, `${formatTitle()}\n⚠️ Nota: el bot no es administrador en este grupo. El borrado automático de mensajes no funcionará hasta que el bot sea admin.`, m, ctxWarn)
       } catch (e) {}
@@ -323,7 +318,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     }
     const entry = shadowMap.get(target)
     if (entry && entry.immutable) {
-      return conn.reply(m.chat, `${formatTitle()}\n❌ No puedes quitar este shadowban manualmente. Es un castigo temporal inmutable.`, m, ctxErr)
+      return conn.reply(m.chat, `${formatTitle()}\n❌ No puedes quitar este shadowban manualmente. Es un castigo inmutable.`, m, ctxErr)
     }
     if (entry && entry.timeoutId) clearTimeout(entry.timeoutId)
     shadowMap.delete(target)
@@ -332,7 +327,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   }
 }
 
-// before: eliminar mensajes de shadowbaneados (si el bot es admin lo intentará; si no, no falla)
 handler.before = async (m, { conn }) => {
   try {
     if (!m || !m.sender) return
@@ -344,14 +338,11 @@ handler.before = async (m, { conn }) => {
     if (!shadowMap.has(sender)) return
     if (m.mtype === 'stickerMessage') return
 
-    // Intentar borrar el mensaje; si falla (no admin), lo ignoramos
     try {
       if (typeof conn.sendMessage === 'function') {
         await conn.sendMessage(m.chat, { delete: m.key })
       }
-    } catch (e) {
-      // ignorar fallo de borrado
-    }
+    } catch (e) {}
   } catch (e) {
     console.error('shadowban before error', e)
   }
@@ -361,7 +352,6 @@ handler.help = ['shadowban']
 handler.tags = ['modmenu']
 handler.command = ['shadowban', 'unshadowban', 'mute', 'unmute']
 handler.group = true
-// No forzamos que el bot sea admin; permitimos ejecución basada en roles
 handler.botAdmin = false
 
 export default handler
