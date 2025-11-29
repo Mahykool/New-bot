@@ -133,7 +133,7 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
 
 handler.pluginId = 'group-welcome'
 handler.help = ['welcome', 'bienvenida']
-handler.tags = ['creador']
+handler.tags = ['modmenu']
 handler.command = ['welcome', 'bienvenida']
 handler.group = true
 handler.botAdmin = true
