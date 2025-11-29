@@ -25,6 +25,9 @@
     "kick": "manage"
   }
 
-  "moderation-plugin": { 
-    "shadowban": "manage" }
+{
+  "moderation-plugin": {
+    "shadowban": "manage",
+    "unshadowban": "manage"
+  }
 }
