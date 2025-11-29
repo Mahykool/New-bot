@@ -66,7 +66,7 @@ const handler = async (m, { conn, command, args, usedPrefix }) => {
   const validLevels = ['none', 'basic', 'manage', 'full']
 
   // ------------------------------
-  // ✅ MENÚ PRINCIPAL — .rolmenu
+  // MENÚ PRINCIPAL — .rolmenu
   // ------------------------------
   if (cmd === 'rolmenu') {
     const info = getRoleInfo(m.sender)
@@ -130,9 +130,7 @@ ${available}
     return conn.reply(m.chat, text, m, ctxOk)
   }
 
-  // ------------------------------
-  // ✅ WHOIS (usuario)
-  // ------------------------------
+  // WHOIS
   if (cmd === 'whois') {
     const target = parseTarget(m, args)
     if (!target)
@@ -150,9 +148,7 @@ ${available}
     return conn.reply(m.chat, format(text), m, ctxOk)
   }
 
-  // ------------------------------
-  // ✅ ROLEINFO (usuario)
-  // ------------------------------
+  // ROLEINFO
   if (cmd === 'roleinfo') {
     const roleId = extractRoleArg(args)
     if (!roleExists(roleId))
@@ -168,20 +164,20 @@ ${available}
 ID: ${roleId}
 Nombre: ${role.name}
 Icono: ${role.icon}
+Nivel de rol: ${role.roleLevel || 'basic'}
 Descripción: ${role.description}
 
-Permisos globales: ${perms}
+Permisos globales:
+${perms !== 'none' ? `- ${perms}` : 'none'}
 
-Plugins:
+Permisos por plugin:
 ${plugins}
 `.trim()
 
     return conn.reply(m.chat, format(text), m, ctxOk)
   }
 
-  // ------------------------------
-  // ✅ GROUPOLES — lista roles del grupo
-  // ------------------------------
+  // GROUPOLES — lista roles del grupo
   if (cmd === 'grouproles') {
     if (!m.isGroup)
       return conn.reply(m.chat, format('Este comando solo funciona en grupos.'), m, ctxWarn)
@@ -202,21 +198,25 @@ ${plugins}
     })
   }
 
-  // ------------------------------
-  // ✅ LISTA DE ROLES — .roles
-  // ------------------------------
+  // LISTA DE ROLES — .roles
   if (cmd === 'roles') {
     requireCommandAccess(m.sender, 'roles-management', 'roles')
 
-    const available = listRoles().join(', ')
-    return conn.reply(m.chat, format(`Roles disponibles: ${available}`), m, ctxOk)
+    const all = listRoles()
+    const text = `
+📚 *ROLES DISPONIBLES EN EL SISTEMA*
+
+${all.map(r => `- ${r}`).join('\n')}
+`.trim()
+
+    return conn.reply(m.chat, format(text), m, ctxOk)
   }
 
   // ------------------------------
-  // ✅ COMANDOS DE MODERACIÓN
+  // COMANDOS DE MODERACIÓN
   // ------------------------------
 
-  // ✅ SETROLE
+  // SETROLE
   if (cmd === 'setrole') {
     requireCommandAccess(m.sender, 'roles-management', 'setrole')
 
@@ -237,7 +237,7 @@ ${plugins}
     )
   }
 
-  // ✅ ADDROLE
+  // ADDROLE
   if (cmd === 'addrole') {
     requireCommandAccess(m.sender, 'roles-management', 'addrole')
 
@@ -258,7 +258,7 @@ ${plugins}
     )
   }
 
-  // ✅ REMOVEROLE
+  // REMOVEROLE
   if (cmd === 'removerole') {
     requireCommandAccess(m.sender, 'roles-management', 'removerole')
 
@@ -279,7 +279,7 @@ ${plugins}
     )
   }
 
-  // ✅ SETPLUGINROLE
+  // SETPLUGINROLE
   if (cmd === 'setpluginrole') {
     requireCommandAccess(m.sender, 'roles-management', 'setpluginrole')
 
@@ -302,7 +302,7 @@ ${plugins}
     rolesConfig[roleId].pluginPermissions[pluginId] = level
 
     saveRolesConfig(rolesConfig)
-    reloadRoles()
+    reloadRoles?.()
 
     return conn.reply(
       m.chat,
@@ -312,17 +312,17 @@ ${plugins}
     )
   }
 
-  // ✅ role reload
+  // role reload
   if (cmd === 'role' && args[0] === 'reload') {
     requireCommandAccess(m.sender, 'roles-management', 'role-reload')
 
-    reloadRoles()
+    reloadRoles?.()
     try { global.userRoles = getUserRolesMap() } catch {}
 
     return conn.reply(m.chat, format('Roles recargados desde disco.'), m, ctxOk)
   }
 
-  // ✅ role list
+  // role list
   if (cmd === 'role' && args[0] === 'list') {
     requireCommandAccess(m.sender, 'roles-management', 'role-list')
 
