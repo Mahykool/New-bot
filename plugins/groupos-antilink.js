@@ -201,10 +201,10 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
   }
 }
 
+handler.command = ['antilink', 'antienlace', 'nolink']
+handler.help = ['antilink', 'antienlace', 'nolink']
 handler.pluginId = 'group-antilink'
-handler.help = ['antilink']
 handler.tags = ['modmenu']
-handler.command = ['antilink', 'antienlace']
 handler.group = true
 handler.botAdmin = true
 
