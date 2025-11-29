@@ -181,9 +181,9 @@ const handler = async (m, { conn, text }) => {
   }
 }
 
-handler.help = ['wm (editar sticker)']
+handler.help = ['sticker']
 handler.tags = ['tools']
-handler.command = ['take', 'robar', 'wm']
-handler.group = false
+handler.command = ['take', 'robar', 'wm', 'sticker']
+handler.group = true
 
 export default handler
