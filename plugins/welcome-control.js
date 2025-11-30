@@ -2,7 +2,7 @@
 /**
  * CONTROL DE WELCOME — SW SYSTEM
  * DESARROLLADO POR: Mahykol
- * VERSIÓN: 3.8.1 (parche: normalización de acciones)
+ * VERSIÓN: 3.8.1 (parche: integración con sistema de permisos)
  */
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
@@ -15,13 +15,17 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
   if (!m.isGroup)
     return conn.reply(m.chat, '❌ Este comando solo funciona en grupos.', m, ctxErr)
 
+  // contexto de chat para whitelist por chat
+  const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+
   // Nivel SW SYSTEM (creador + mod)
   // pluginId: "group-welcome"
   // command:  "welcome"
   try {
-    requireCommandAccess(m.sender, 'group-welcome', 'welcome')
+    // uso correcto de requireCommandAccess: pasar el mensaje completo y chatCfg
+    requireCommandAccess(m, 'group-welcome', 'welcome', chatCfg)
   } catch (e) {
-    if (e.code === 'ACCESS_DENIED') {
+    if (e && e.code === 'ACCESS_DENIED') {
       return conn.reply(
         m.chat,
         '> No tienes nivel suficiente para configurar el *WELCOME*.',
