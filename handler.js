@@ -1,3 +1,4 @@
+// handler.js
 import { smsg } from './lib/simple.js'
 import { format } from 'util'
 import { fileURLToPath } from 'url'
@@ -6,7 +7,7 @@ import { unwatchFile, watchFile } from 'fs'
 import chalk from 'chalk'
 import fetch from 'node-fetch'
 
-import { canUsePlugin } from './lib/permissions-middleware.js'
+import { canUsePlugin, requireCommandAccess } from './lib/permissions-middleware.js'
 import { getUserRoles } from './lib/lib-roles.js'
 
 if (typeof global.__filename !== 'function') global.__filename = u => fileURLToPath(u)
@@ -85,25 +86,20 @@ function parseUserTargets(input, options = {}) {
         };
         const opts = { ...defaults, ...options };
 
-        // Si ya es un array, devolverlo limpiando
         if (Array.isArray(input)) {
             return input.map(jid => normalizeJid(jid)).filter(jid => jid);
         }
 
-        // Si es string, procesarlo
         if (typeof input === 'string') {
             let targets = [];
 
-            // Procesar menciones si están disponibles y se solicita
-            if (opts.resolveMentions && m && m._mentionedJidResolved && m._mentionedJidResolved.length > 0) {
+            if (opts.resolveMentions && typeof m !== 'undefined' && m && m._mentionedJidResolved && m._mentionedJidResolved.length > 0) {
                 targets.push(...m._mentionedJidResolved.map(jid => normalizeJid(jid)));
             }
 
-            // Procesar texto para extraer números/JIDs
             const textTargets = input.split(/[,;\s\n]+/).map(item => item.trim()).filter(item => item);
 
             for (let item of textTargets) {
-                // Si es una mención (@usuario)
                 if (item.startsWith('@')) {
                     const num = item.substring(1);
                     if (num) {
@@ -113,7 +109,6 @@ function parseUserTargets(input, options = {}) {
                     continue;
                 }
 
-                // Si es un número de teléfono
                 if (/^[\d+][\d\s\-()]+$/.test(item)) {
                     const cleanNum = item.replace(/[^\d+]/g, '');
                     if (cleanNum.length >= 8) {
@@ -123,22 +118,18 @@ function parseUserTargets(input, options = {}) {
                     continue;
                 }
 
-                // Si ya parece un JID
                 if (item.includes('@')) {
                     targets.push(normalizeJid(item));
                     continue;
                 }
 
-                // Para otros casos, tratar como número
                 if (/^\d+$/.test(item) && item.length >= 8) {
                     targets.push(`${item}@s.whatsapp.net`);
                 }
             }
 
-            // Eliminar duplicados y limpiar
             targets = [...new Set(targets.map(jid => normalizeJid(jid)).filter(jid => jid))];
 
-            // Limitar número máximo de targets
             if (opts.maxTargets && targets.length > opts.maxTargets) {
                 targets = targets.slice(0, opts.maxTargets);
             }
@@ -163,17 +154,15 @@ async function handlePrimaryBotSystem(m, conn) {
     const universalWords = ['resetbot', 'resetprimario', 'botreset', 'setprimary', 'primary', 'unprimary'];
     const firstWord = m.text ? m.text.trim().split(' ')[0].toLowerCase().replace(/^[./#]/, '') : '';
 
-    // Permitir comandos universales de administración de primary bot
     if (universalWords.includes(firstWord)) {
         return false;
     }
 
-    // Si este bot no es el primary bot, no procesar el comando
     if (conn?.user?.jid !== chat.primaryBot) {
-        return true; // Indicar que se debe ignorar el comando
+        return true;
     }
 
-    return false; // Continuar con el procesamiento normal
+    return false;
 }
 
 export async function handler(chatUpdate) {
@@ -238,9 +227,7 @@ export async function handler(chatUpdate) {
       const chat = (typeof this.decodeJid === 'function' ? this.decodeJid(chatJid) : decodeJidCompat(chatJid))
       if (!/@g.us$/.test(chat || '')) throw new Error('groupParticipantsUpdate: JID de chat inválido')
       const unique = [...new Set((Array.isArray(ids) ? ids : [ids]).filter(Boolean))]
-      // Por defecto, no resolver vía onWhatsApp para evitar timeouts. Confiar en JIDs normalizados.
       let targets = [...new Set(unique.map(x => normalizeJid(String(x))).filter(v => /@s\.whatsapp\.net$/.test(v)))]
-      // Si se solicita explícitamente, permitir resolución (podría ser más lento / propenso a timeout)
       if (options?.resolve === true) {
         const resolved = []
         for (const t of unique) {
@@ -293,7 +280,6 @@ export async function handler(chatUpdate) {
     m = smsg(this, m) || m
     if (!m) return
 
-    // SISTEMA PRIMARY BOT - VERIFICACIÓN MEJORADA
     const shouldIgnore = await handlePrimaryBotSystem(m, this);
     if (shouldIgnore) return;
 
@@ -326,21 +312,18 @@ export async function handler(chatUpdate) {
         if (!('useDocument' in user)) user.useDocument = false
         if (!isNumber(user.level)) user.level = 0
         if (!isNumber(user.bank)) user.bank = 0
-  } else global.db.data.users[m.sender] = { exp: 0, limit: 10, registered: false, name: m.name, age: null, regTime: -1, afk: -1, afkReason: '', banned: false, useDocument: true, bank: 0, level: 0 }
+      } else global.db.data.users[m.sender] = { exp: 0, limit: 10, registered: false, name: m.name, age: null, regTime: -1, afk: -1, afkReason: '', banned: false, useDocument: true, bank: 0, level: 0 }
       if (numKey && !global.db.data.users[numKey]) global.db.data.users[numKey] = global.db.data.users[m.sender]
       let chat = global.db.data.chats[m.chat]
       if (typeof chat !== 'object') global.db.data.chats[m.chat] = {}
       const cfgDefaults = (global.chatDefaults && typeof global.chatDefaults === 'object') ? global.chatDefaults : {}
       if (chat) {
         for (const [k, v] of Object.entries(cfgDefaults)) { if (!(k in chat)) chat[k] = v }
-        // Alias: mantener 'bienvenida' sincronizado si usas 'welcome'
-        if (!('bienvenida' in chat) && ('welcome' in chat)) chat.bienvenida = !!chat.welcome
-        // SISTEMA PRIMARY BOT - INICIALIZACIÓN
+        if (!('bienvenida' in chat) && ('welcome' in cfgDefaults)) chat.bienvenida = !!cfgDefaults.welcome
         if (!('primaryBot' in chat)) chat.primaryBot = null
       } else {
         global.db.data.chats[m.chat] = { ...cfgDefaults }
         if (!('bienvenida' in global.db.data.chats[m.chat]) && ('welcome' in cfgDefaults)) global.db.data.chats[m.chat].bienvenida = !!cfgDefaults.welcome
-        // SISTEMA PRIMARY BOT - INICIALIZACIÓN
         global.db.data.chats[m.chat].primaryBot = null
       }
       const botIdKey = this.user?.jid || (this.user?.id ? this.decodeJid(this.user.id) : 'bot')
@@ -360,7 +343,6 @@ export async function handler(chatUpdate) {
     const isAllowed = allowedBots.includes(this.user.jid)
     if (isSubbs && !isAllowed) return
 
-    // SISTEMA PRIMARY BOT MEJORADO
     if (m.isGroup) {
         const chat = global.db.data.chats[m.chat];
         if (chat?.primaryBot && chat.primaryBot !== this.user.jid) {
@@ -368,20 +350,18 @@ export async function handler(chatUpdate) {
             const firstWord = m.text ? m.text.trim().split(' ')[0].toLowerCase().replace(/^[./#]/, '') : '';
 
             if (!universalWords.includes(firstWord)) {
-                // Verificar si el primary bot está conectado y en el grupo
                 try {
                     const groupMetadata = await this.groupMetadata(m.chat).catch(() => null);
                     const primaryBotInGroup = groupMetadata?.participants?.some(p => p.id === chat.primaryBot);
                     
                     if (primaryBotInGroup) {
-                        return; // Ignorar comando si el primary bot está en el grupo
+                        return;
                     } else {
-                        // Si el primary bot no está en el grupo, limpiar la configuración
                         chat.primaryBot = null;
                     }
                 } catch (error) {
                     console.error('Error verificando primary bot:', error);
-                    chat.primaryBot = null; // Limpiar en caso de error
+                    chat.primaryBot = null;
                 }
             }
         }
@@ -474,22 +454,16 @@ export async function handler(chatUpdate) {
       return n
     }
 
-    // Función displayTag mejorada para mostrar nombres en menciones
     const displayTag = async (jid) => {
       const real = (typeof this.decodeJid === 'function' ? this.decodeJid(jid) : decodeJidCompat(jid))
       const num = prettyNum(real)
       const n = await nameOnlyIfExists(real)
-
-      // Si tenemos un nombre y no es solo números, usamos el nombre
       if (n && n.trim() !== '' && !/^\+?[0-9\s\-]+$/.test(n)) {
         return n.trim()
       }
-
-      // Si no tenemos nombre o es solo números, mostramos el número formateado
       return num
     }
 
-    // Función getUserInfo - AGREGADA
     const getUserInfo = async (jid, options = {}) => {
         try {
             const normalizedJid = normalizeJid(jid);
@@ -590,7 +564,6 @@ export async function handler(chatUpdate) {
       }
       if (!opts['restrict']) if (plugin.tags && plugin.tags.includes('admin')) { continue }
 
-      // CORRECCIÓN: Expresión regular fija
       const str2Regex = str => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&')
 
       let _prefix = plugin.customPrefix ? plugin.customPrefix : /^[./!#]/
@@ -629,56 +602,59 @@ export async function handler(chatUpdate) {
           if (name != 'owner-unbanuser.js' && user?.banned) return
           if (name != 'owner-unbanbot.js' && setting?.banned) return
         }
-if (plugin.rowner && !rolesCtx.isROwner) { fail('rowner', m, this); continue }
-if (plugin.owner && !(rolesCtx.isOwner || rolesCtx.isROwner)) { fail('owner', m, this); continue }
+        if (plugin.rowner && !rolesCtx.isROwner) { fail('rowner', m, this); continue }
+        if (plugin.owner && !(rolesCtx.isOwner || rolesCtx.isROwner)) { fail('owner', m, this); continue }
 
-// Compatibilidad: plugin.mods ahora verifica roles 'staff' u 'owner' en user-roles.json
-if (plugin.mods) {
-  try {
-    const roles = getUserRoles(m.sender) || []
-    const isStaff = roles.includes('staff')
-    const isOwner = roles.includes('owner') || (Array.isArray(global.roowner) && global.roowner.includes(m.sender))
-    if (!isStaff && !isOwner) { fail('mods', m, this); continue }
-  } catch (e) {
-    console.error('Error comprobando plugin.mods:', e)
-    fail('mods', m, this); continue
-  }
-}
+        if (plugin.mods) {
+          try {
+            const roles = getUserRoles(m.sender) || []
+            const isStaff = roles.includes('staff')
+            const isOwner = roles.includes('owner') || (Array.isArray(global.roowner) && global.roowner.includes(m.sender))
+            if (!isStaff && !isOwner) { fail('mods', m, this); continue }
+          } catch (e) {
+            console.error('Error comprobando plugin.mods:', e)
+            fail('mods', m, this); continue
+          }
+        }
 
-if (plugin.premium && !rolesCtx.isPrems) { fail('premium', m, this); continue }
-if (plugin.group && !m.isGroup) { fail('group', m, this); continue }
-else if (plugin.botAdmin && !isBotAdmin) { fail('botAdmin', m, this); continue }
-else if (plugin.admin && !isAdmin) { fail('admin', m, this); continue }
-if (plugin.private && m.isGroup) { fail('private', m, this); continue }
-if (plugin.register == true && _user.registered == false) { fail('unreg', m, this); continue }
+        if (plugin.premium && !rolesCtx.isPrems) { fail('premium', m, this); continue }
+        if (plugin.group && !m.isGroup) { fail('group', m, this); continue }
+        else if (plugin.botAdmin && !isBotAdmin) { fail('botAdmin', m, this); continue }
+        else if (plugin.admin && !isAdmin) { fail('admin', m, this); continue }
+        if (plugin.private && m.isGroup) { fail('private', m, this); continue }
+        if (plugin.register == true && _user.registered == false) { fail('unreg', m, this); continue }
 
-m.isCommand = true
-let xp = 'exp' in plugin ? parseInt(plugin.exp) : 17
-if (xp > 200) m.reply('chirrido -_-')
-else m.exp += xp
-if (plugin.limit && global.db.data.users[m.sender].limit < plugin.limit * 1) { this.reply(m.chat, `Se agotaron tus *Dolares 💲*`, m); continue }
+        m.isCommand = true
+        let xp = 'exp' in plugin ? parseInt(plugin.exp) : 17
+        if (xp > 200) m.reply('chirrido -_-')
+        else m.exp += xp
+        if (plugin.limit && global.db.data.users[m.sender].limit < plugin.limit * 1) { this.reply(m.chat, `Se agotaron tus *Dolares 💲*`, m); continue }
 
-let extra = { match, usedPrefix, noPrefix, _args, args, command, text, conn: this, participants, groupMetadata, user: participantUser || {}, bot: botParticipant || {}, isROwner: rolesCtx.isROwner, isOwner: rolesCtx.isOwner, isRAdmin, isAdmin, isBotAdmin, isPrems: rolesCtx.isPrems, chatUpdate, __dirname: ___dirname, __filename, displayTag: m.displayTag, badges: m.badges, role: m.role, parseUserTargets, getUserInfo }
+        let extra = { match, usedPrefix, noPrefix, _args, args, command, text, conn: this, participants, groupMetadata, user: participantUser || {}, bot: botParticipant || {}, isROwner: rolesCtx.isROwner, isOwner: rolesCtx.isOwner, isRAdmin, isAdmin, isBotAdmin, isPrems: rolesCtx.isPrems, chatUpdate, __dirname: ___dirname, __filename, displayTag: m.displayTag, badges: m.badges, role: m.role, parseUserTargets, getUserInfo }
 
-// Validación declarativa mínima (si el plugin declara pluginId/requiredLevel)
-try {
-  const pluginId = plugin.pluginId || (Array.isArray(plugin.command) ? (plugin.command[0] || '') : (typeof plugin.command === 'string' ? plugin.command : ''))
-  const requiredLevel = plugin.requiredLevel || null
-  if (pluginId && requiredLevel) {
-    if (!canUsePlugin(m.sender, pluginId, requiredLevel)) {
-      // Si no tienes dfail('access') definido, reemplaza la siguiente línea por this.reply(...)
-      try { fail('access', m, this) } catch { this.reply(m.chat, '✘ Acceso denegado: no tienes permisos para usar este comando.', m) }
-      continue
-    }
-  }
-} catch (err) {
-  console.error('Error validando permisos declarativos:', err)
-  try { fail('access', m, this) } catch { this.reply(m.chat, '✘ Acceso denegado', m) }
-  continue
-}
+        // Añadir chatCfg para permisos basados en chat (mínimo, sin cambiar flujo)
+        const chatCfgLocal = global.db?.data?.chats?.[m.chat] || {}
 
-let didPresence = false
-try {
+        // Validación declarativa mínima usando requireCommandAccess (manteniendo dfail)
+        try {
+          const pluginId = plugin.pluginId || (Array.isArray(plugin.command) ? (plugin.command[0] || '') : (typeof plugin.command === 'string' ? plugin.command : ''))
+          const requiredLevel = plugin.requiredLevel || null
+          if (pluginId && requiredLevel) {
+            try {
+              requireCommandAccess(m, pluginId, command, chatCfgLocal)
+            } catch (errAccess) {
+              try { fail('access', m, this) } catch { this.reply(m.chat, '✘ Acceso denegado: no tienes permisos para usar este comando.', m) }
+              continue
+            }
+          }
+        } catch (err) {
+          console.error('Error validando permisos declarativos:', err)
+          try { fail('access', m, this) } catch { this.reply(m.chat, '✘ Acceso denegado', m) }
+          continue
+        }
+
+        let didPresence = false
+        try {
           const botIdKey = this.user?.jid || (this.user?.id ? this.decodeJid(this.user.id) : 'bot')
           const autotypeEnabled = !!global.db?.data?.settings?.[botIdKey]?.autotypeDotOnly
           if (autotypeEnabled && usedPrefix === '.' && typeof this.sendPresenceUpdate === 'function') {
@@ -686,89 +662,25 @@ try {
             didPresence = true
             await this.sendPresenceUpdate('composing', m.chat)
           }
-          await plugin.call(this, m, extra)
-          m.limit = m.limit || plugin.limit || false
-        } catch (e) {
-          m.error = e
-          console.error(e)
-          if (e) {
-            let text = format(e)
-            for (let key of Object.values(global.APIKeys || {})) text = text.replace(new RegExp(key, 'g'), '#HIDDEN#')
-            m.reply(text)
+          try {
+            await plugin.call(this, m, extra)
+          } catch (errPlugin) {
+            console.error('Plugin execution error', name, errPlugin)
+            try { this.reply(m.chat, 'Ocurrió un error ejecutando el comando.', m) } catch {}
           }
+          m.limit = m.limit || 0
+        } catch (e) {
+          console.error('Error en ejecución de plugin', e)
         } finally {
           if (didPresence) {
-            try { await this.sendPresenceUpdate('paused', m.chat) } catch {}
             try { this._presenceGates.delete(m.chat) } catch {}
           }
-          if (typeof plugin.after === 'function') {
-            try { await plugin.after.call(this, m, extra) } catch (e) { console.error(e) }
-          }
-          if (m.limit) this.reply(m.chat, `Utilizaste *${+m.limit}* Dolares 💲`, m)
         }
-        break
       }
     }
-
   } catch (e) {
-    console.error(e)
-  } finally {
-    if (opts['queque'] && m.text) {
-      const quequeIndex = this.msgqueque.indexOf(m.id || m.key.id)
-      if (quequeIndex !== -1) this.msgqueque.splice(quequeIndex, 1)
-    }
-    let user, stats = global.db.data.stats
-    if (m) {
-      if (m.sender && (user = global.db.data.users[m.sender])) {
-        user.exp += m.exp
-        user.limit -= m.limit * 1
-      }
-      let stat
-      if (m.plugin) {
-        let now = +new Date
-        if (m.plugin in stats) {
-          stat = stats[m.plugin]
-          if (!isNumber(stat.total)) stat.total = 1
-          if (!isNumber(stat.success)) stat.success = m.error != null ? 0 : 1
-          if (!isNumber(stat.last)) stat.last = now
-          if (!isNumber(stat.lastSuccess)) stat.lastSuccess = m.error != null ? 0 : now
-        } else stat = stats[m.plugin] = { total: 1, success: m.error != null ? 0 : 1, last: now, lastSuccess: m.error != null ? 0 : now }
-        stat.total += 1
-        stat.last = now
-        if (m.error == null) { stat.success += 1; stat.lastSuccess = now }
-      }
-    }
-    try { if (!opts['noprint']) await (await import('./lib/print.js')).default(m, this) } catch (e) { console.log(m, m.quoted, e) }
-    const botIdKey = this.user?.jid || (this.user?.id ? this.decodeJid(this.user.id) : 'bot')
-    const settingsREAD = global.db.data.settings[botIdKey] || {}
-    if (opts['autoread']) await this.readMessages([m.key])
-    if (settingsREAD.autoread) await this.readMessages([m.key])
+    console.error('Handler top error', e)
   }
 }
 
-global.dfail = (type, m, conn, usedPrefix) => {
-  const ctxDenied = global.rcanalden || {}
-  const ctxDev    = global.rcanaldev || {}
-  const ctxInfo   = global.rcanalx   || {}
-  const cfg = {
-    rowner:   { text: '🌸 𝗝𝗮𝗷𝗮𝗷𝗮 𝗲𝘀𝘁𝗲 𝗰𝗼𝗺𝗮𝗻𝗱𝗼 𝘀𝗼𝗹𝗼 𝗽𝘂𝗲𝗱𝗲 𝘂𝘀𝗮𝗿𝗹𝗼 𝗺𝗶 𝗰𝗿𝗲𝗮𝗱𝗼𝗿 😤', ctx: ctxDenied },
-    owner:    { text: '🌸 𝗘𝘀𝘁𝗲 𝗰𝗼𝗺𝗮𝗻𝗱𝗼 𝗲𝘀𝘁𝗮́ 𝗿𝗲𝘀𝗲𝗿𝘃𝗮𝗱𝗼 𝗽𝗮𝗿𝗮 𝗺𝗶 𝗰𝗿𝗲𝗮𝗱𝗼𝗿 𝘆 𝗹𝗼𝘀 𝘀𝘂𝗯-𝗯𝗼𝘁𝘀 🙄', ctx: ctxDenied },
-    mods:     { text: '🌸 𝗘𝘀𝘁𝗲 𝗰𝗼𝗺𝗮𝗻𝗱𝗼 𝘀𝗼𝗹𝗼 𝗹𝗼 𝗽𝘂𝗲𝗱𝗲𝗻 𝘂𝘀𝗮𝗿 𝗹𝗼𝘀 𝗺𝗼𝗱𝗲𝗿𝗮𝗱𝗼𝗿𝗲𝘀 💢', ctx: ctxDev },
-    premium:  { text: '🌸 𝗘𝘀𝘁𝗲 𝗰𝗼𝗺𝗮𝗻𝗱𝗼 𝗲𝘀 𝗲𝘅𝗰𝗹𝘂𝘀𝗶𝘃𝗼 𝗽𝗮𝗿𝗮 𝘂𝘀𝘂𝗮𝗿𝗶𝗼𝘀 𝗽𝗿𝗲𝗺𝗶𝘂𝗺 💖', ctx: ctxDenied },
-    group:    { text: '🌸 𝗘𝘀𝘁𝗲 𝗰𝗼𝗺𝗮𝗻𝗱𝗼 𝘀𝗼𝗹𝗼 𝘀𝗲 𝗽𝘂𝗲𝗱𝗲 𝘂𝘀𝗮𝗿 𝗲𝗻 𝗴𝗿𝘂𝗽𝗼𝘀 😡', ctx: ctxInfo },
-    private:  { text: '🌸 𝗘𝘀𝘁𝗲 𝗰𝗼𝗺𝗮𝗻𝗱𝗼 𝘀𝗼𝗹𝗼 𝗳𝘂𝗻𝗰𝗶𝗼𝗻𝗮 𝗲𝗻 𝗺𝗶 𝗰𝗵𝗮𝘁 𝗽𝗿𝗶𝘃𝗮𝗱𝗼 😏', ctx: ctxInfo },
-    admin:    { text: '🌸 𝗦𝗼𝗹𝗼 𝗹𝗼𝘀 𝗮𝗱𝗺𝗶𝗻𝗶𝘀𝘁𝗿𝗮𝗱𝗼𝗿𝗲𝘀 𝗱𝗲𝗹 𝗴𝗿𝘂𝗽𝗼 𝗽𝘂𝗲𝗱𝗲𝗻 𝘂𝘀𝗮𝗿 𝗲𝘀𝘁𝗼 😤', ctx: ctxDenied },
-    botAdmin: { text: '🌸 𝗡𝗲𝗰𝗲𝘀𝗶𝘁𝗼 𝘀𝗲𝗿 𝗮𝗱𝗺𝗶𝗻𝗶𝘀𝘁𝗿𝗮𝗱𝗼𝗿𝗮 𝗽𝗮𝗿𝗮 𝗲𝗷𝗲𝗰𝘂𝘁𝗮𝗿 𝗲𝘀𝘁𝗲 𝗰𝗼𝗺𝗮𝗻𝗱𝗼 🙄', ctx: ctxInfo },
-    unreg:    { text: '🌸 𝗡𝗼 𝗲𝘀𝘁𝗮́𝘀 𝗿𝗲𝗴𝗶𝘀𝘁𝗿𝗮𝗱𝗼 𝗮𝘂́𝗻\n\n𝗥𝗲𝗴𝗶́𝘀𝘁𝗿𝗮𝘁𝗲 𝗽𝗿𝗶𝗺𝗲𝗿𝗼 𝗰𝗼𝗻:\n\n.𝗿𝗲𝗴 𝗻𝗼𝗺𝗯𝗿𝗲.𝗲𝗱𝗮𝗱\n\n𝗘𝗷𝗲𝗺𝗽𝗹𝗼: .𝗿𝗲𝗴 𝗜𝘁𝘀𝘂𝗸𝗶.𝟭𝟴\n\n𝗬 𝗻𝗮𝗱𝗮 𝗱𝗲 𝗷𝘂𝗴𝗮𝗿 𝗰𝗼𝗻 𝗹𝗼𝘀 * * 😒', ctx: ctxInfo },
-    restrict: { text: '🌸 𝗘𝘀𝘁𝗮 𝗰𝗮𝗿𝗮𝗰𝘁𝗲𝗿𝗶́𝘀𝘁𝗶𝗰𝗮 𝗲𝘀𝘁𝗮́ 𝗱𝗲𝘀𝗵𝗮𝗯𝗶𝗹𝗶𝘁𝗮𝗱𝗮 💢', ctx: ctxInfo },
-}[type]
-if (!cfg) return
-return conn.reply(m.chat, cfg.text, m, cfg.ctx).then(() => m.react('✖️'))
-}
-
-let file = global.__filename(import.meta.url, true)
-watchFile(file, async () => {
-  unwatchFile(file)
-  console.log(chalk.magenta("Se actualizo 'handler.js'"))
-  if (global.reloadHandler) console.log(await global.reloadHandler())
-})
+export default { handler }
