@@ -1,5 +1,6 @@
 // plugins/roles-management.js
 // SW SYSTEM — Roles Manager (versión final optimizada)
+// Parche: usar parseTarget centralizado para normalizar menciones/respuestas/números
 
 import {
   getRolesConfig,
@@ -19,30 +20,11 @@ import {
 } from '../lib/lib-roles.js'
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
+import { parseTarget } from '../lib/utils.js' // <-- import del helper central
 
 // ------------------------------
 // Helpers
 // ------------------------------
-function parseTarget(m, args = []) {
-  if (Array.isArray(m.mentionedJid) && m.mentionedJid.length > 0)
-    return normalizeJid(m.mentionedJid[0])
-
-  if (m.quoted) {
-    const q = m.quoted
-    const cand = q.sender || q.participant || q.key?.participant || q.key?.remoteJid
-    if (cand) return normalizeJid(cand)
-  }
-
-  for (const a of args) {
-    if (!a) continue
-    const raw = String(a).replace(/[^\d@.+]/g, '')
-    if (!raw) continue
-    return normalizeJid(raw.includes('@') ? raw : raw)
-  }
-
-  return null
-}
-
 function extractRoleArg(args = []) {
   for (const a of args) {
     if (!a || a.startsWith('@') || /^@\d+/.test(a)) continue
