@@ -1,10 +1,12 @@
-// plugins/group-antilink.js — Versión PRO con fix de JID
-// Antilink con shadowban progresivo, kick, borrado, roles protegidos y auto-detección silenciosa
+// plugins/group-antilink.js — Versión PRO FINAL SW
+// Antilink 100% integrado con permisos SW, roles, shadowban real y strikes progresivos.
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { normalizeJid, getUserRoles } from '../lib/lib-roles.js'
 
-const PROTECTED_ROLES = ['creador', 'owner', 'mod', 'admin', 'staff']
+/* ============================
+   CONFIG
+============================ */
 const STRIKE_RESET_HOURS = 24
 
 const STRIKE_ACTIONS = {
@@ -32,6 +34,9 @@ function formatTitle() {
   return 'ㅤׄㅤׅㅤׄ _*ANTILINK*_ ㅤ֢ㅤㅤׅ'
 }
 
+/* ============================
+   STRIKES
+============================ */
 if (!global.antilinkStrikes) global.antilinkStrikes = {}
 
 function getStrikes(chat, user) {
@@ -42,6 +47,7 @@ function getStrikes(chat, user) {
   const now = Date.now()
   const diff = now - entry.timestamp
   const resetMs = STRIKE_RESET_HOURS * 60 * 60 * 1000
+
   if (diff > resetMs) {
     delete global.antilinkStrikes[key]
     return 0
@@ -53,26 +59,27 @@ function getStrikes(chat, user) {
 function addStrike(chat, user) {
   const key = `${chat}:${user}`
   const now = Date.now()
+
   if (!global.antilinkStrikes[key]) {
     global.antilinkStrikes[key] = { count: 1, timestamp: now }
   } else {
     global.antilinkStrikes[key].count++
     global.antilinkStrikes[key].timestamp = now
   }
+
   return global.antilinkStrikes[key].count
 }
 
-let handler = async (m, { conn, args, usedPrefix, isAdmin }) => {
+/* ============================
+   COMANDO PRINCIPAL
+============================ */
+let handler = async (m, { conn, args, usedPrefix }) => {
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
 
   try {
     requireCommandAccess(m, 'group-antilink', 'antilink', chatCfg)
   } catch {
-    return conn.reply(m.chat, `${formatTitle()}\n❌ No tienes permiso para configurar el Antilink.`, m)
-  }
-
-  if (!isAdmin) {
-    return conn.reply(m.chat, `${formatTitle()}\n⚠️ Solo administradores del grupo pueden usar este comando.`, m)
+    return conn.reply(m.chat, `${formatTitle()}\n❌ No tienes permiso para usar este comando.`, m)
   }
 
   const action = (args[0] || '').toLowerCase()
@@ -115,62 +122,71 @@ let handler = async (m, { conn, args, usedPrefix, isAdmin }) => {
   }
 }
 
-handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
+/* ============================
+   BEFORE: DETECCIÓN DE LINKS
+============================ */
+handler.before = async (m, { conn }) => {
   try {
     if (!m.isGroup || !global.antilinkStatus?.[m.chat]) return
 
     const text = (m.text || m.caption || '').trim()
     if (!text) return
 
-    let hasLink = LINK_PATTERNS.some(p => p.test(text))
+    const hasLink = LINK_PATTERNS.some(p => p.test(text))
     if (!hasLink) return
 
-    const sender = normalizeJid(m.sender || m.participant || '')
-    if (!sender || typeof sender !== 'string') return
+    const sender = normalizeJid(m.sender)
+    if (!sender) return
 
     const botJid = normalizeJid(conn.user?.id)
     if (sender === botJid) return
-    if (isAdmin) return
 
-    let roles = []
+    /* ============================
+       PERMISOS SW (MANDAN)
+    ============================ */
+    const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+
     try {
-      roles = getUserRoles(sender).map(r => r.toLowerCase())
-    } catch (e) {
-      console.warn('Antilink: error al obtener roles de', sender, e)
+      // Si el usuario tiene permiso → NO castigar
+      requireCommandAccess(m, 'group-antilink', 'antilink-detect', chatCfg)
+      return
+    } catch {
+      // Si NO tiene permiso → castigo
     }
 
-    if (roles.some(r => PROTECTED_ROLES.includes(r))) return
+    /* ============================
+       MENSAJE DE DETECCIÓN
+    ============================ */
+    await conn.sendMessage(m.chat, {
+      text: `${formatTitle()}\n⚠️ *ENLACE DETECTADO*\nUsuario: @${sender.split('@')[0]}`,
+      mentions: [sender]
+    })
 
-    try {
-      await conn.sendMessage(m.chat, {
-        text: `${formatTitle()}\n⚠️ *ENLACE DETECTADO*\nUsuario: @${sender.split('@')[0]}`,
-        mentions: [sender]
-      })
-    } catch {}
-
+    /* ============================
+       BORRAR MENSAJE
+    ============================ */
     try {
       if (typeof conn.deleteMessage === 'function') {
         await conn.deleteMessage(m.chat, m.key)
       } else {
-        await conn.sendMessage(m.chat, {
-          delete: {
-            remoteJid: m.chat,
-            fromMe: false,
-            id: m.key?.id,
-            participant: sender
-          }
-        })
+        await conn.sendMessage(m.chat, { delete: m.key })
       }
     } catch {}
 
+    /* ============================
+       STRIKES
+    ============================ */
     const strikes = addStrike(m.chat, sender)
     const action = STRIKE_ACTIONS[strikes] || STRIKE_ACTIONS[3]
 
-    const tag = `@${sender.split('@')[0]}`
-    const msg = `${formatTitle()}\n⚠️ *ENLACE DETECTADO*\nUsuario: ${tag}\nStrike: *${strikes}/3*\nAcción: *${action.type === 'kick' ? 'Expulsión' : 'Shadowban ' + action.minutes + 'm'}*`
+    await conn.sendMessage(m.chat, {
+      text: `${formatTitle()}\n⚠️ *ENLACE DETECTADO*\nUsuario: @${sender.split('@')[0]}\nStrike: *${strikes}/3*\nAcción: *${action.type === 'kick' ? 'Expulsión' : 'Shadowban ' + action.minutes + 'm'}*`,
+      mentions: [sender]
+    })
 
-    await conn.sendMessage(m.chat, { text: msg, mentions: [sender] })
-
+    /* ============================
+       SHADOWBAN REAL
+    ============================ */
     if (action.type === 'shadowban') {
       const fake = {
         ...m,
@@ -196,12 +212,24 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
       }
     }
 
-    if (action.type === 'kick' && isBotAdmin) {
-      await conn.groupParticipantsUpdate(m.chat, [sender], 'remove')
+    /* ============================
+       EXPULSIÓN REAL
+    ============================ */
+    if (action.type === 'kick') {
+      const botRoles = getUserRoles(conn.user.id).map(r => r.toLowerCase())
+      const botHasPower =
+        botRoles.includes('mod') ||
+        botRoles.includes('moderador') ||
+        botRoles.includes('creador') ||
+        botRoles.includes('owner')
+
+      if (botHasPower) {
+        await conn.groupParticipantsUpdate(m.chat, [sender], 'remove')
+      }
     }
 
   } catch (e) {
-    console.error('Error en Antilink PRO:', e)
+    console.error('Error en Antilink PRO FINAL:', e)
   }
 }
 
