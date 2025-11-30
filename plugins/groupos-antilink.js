@@ -5,7 +5,7 @@ import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { normalizeJid, getUserRoles, getRoleInfo } from '../lib/lib-roles.js'
 import { parseTarget } from '../lib/utils.js'
 
-const PROTECTED_ROLES = ['creador', 'mod'] // roles que no deben ser expulsados por antilink
+const PROTECTED_ROLES = ['creador', 'owner', 'mod', 'admin', 'staff'] // roles que no deben ser expulsados por antilink
 const DEFAULT_LINK_PATTERNS = [
   /https?:\/\/[^\s]+/gi,
   /www\.[^\s]+/gi,
@@ -37,13 +37,17 @@ let handler = async (m, { conn, args = [], usedPrefix = '/', isAdmin, isBotAdmin
 
   if (!m.isGroup) return conn.reply(m.chat, '❌ Solo puedo usarse en grupos.', m, ctxErr)
 
-  // Verificar permiso en el sistema de roles
+  // contexto de chat para whitelist por chat
+  const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+
+  // Verificar permiso en el sistema de roles (uso correcto de requireCommandAccess)
   try {
-    requireCommandAccess(m.sender, 'group-antilink', 'antilink')
+    requireCommandAccess(m, 'group-antilink', 'antilink', chatCfg)
   } catch (e) {
     if (e && e.code === 'ACCESS_DENIED') {
       return conn.reply(m.chat, '> ❌ No tienes nivel suficiente para configurar el ANTILINK.', m, ctxErr)
     }
+    // si es otro error, re-lanzar para que se registre
     throw e
   }
 
@@ -145,7 +149,7 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
       }
       if (PROTECTED_ROLES.includes((senderRoleInfo.id || '').toLowerCase())) return
     } catch (e) {
-      // si falla la comprobación de roles, no bloqueamos por defecto; seguimos con precaución
+      // si falla la comprobación de roles, seguimos con precaución (no bloqueamos por defecto)
     }
 
     // Aviso público con mención
@@ -178,6 +182,25 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
     if (isBotAdmin) {
       try {
         if (typeof conn.groupParticipantsUpdate === 'function') {
+          // Antes de expulsar, comprobar que el target no es protegido por roles (doble verificación)
+          try {
+            const targetRoles = (getUserRoles(senderJid) || []).map(r => String(r).toLowerCase())
+            const targetRoleInfo = getRoleInfo(senderJid) || {}
+            for (const pr of PROTECTED_ROLES) {
+              if (targetRoles.includes(pr)) {
+                // no expulsar si tiene rol protegido
+                await conn.sendMessage(m.chat, { text: `✖️ No puedo expulsar a @${senderJid.split('@')[0]} porque tiene un rol protegido.`, mentions: [senderJid] })
+                return
+              }
+            }
+            if (PROTECTED_ROLES.includes((targetRoleInfo.id || '').toLowerCase())) {
+              await conn.sendMessage(m.chat, { text: `✖️ No puedo expulsar a @${senderJid.split('@')[0]} porque tiene un rol protegido.`, mentions: [senderJid] })
+              return
+            }
+          } catch (e) {
+            // si falla la comprobación, no bloqueamos la expulsión por completo; intentamos expulsar y capturamos errores
+          }
+
           await conn.groupParticipantsUpdate(m.chat, [senderJid], 'remove')
         } else if (typeof conn.groupRemove === 'function') {
           await conn.groupRemove(m.chat, [senderJid])
