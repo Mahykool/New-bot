@@ -1,18 +1,19 @@
 {
   "roles-management": {
+  "roles-management": {
     "rolmenu": "basic",
     "whois": "basic",
     "roleinfo": "basic",
     "grouproles": "basic",
     "roles": "basic",
-
+    
     "setrole": "full",
     "addrole": "full",
     "removerole": "full",
     "setpluginrole": "full",
-
     "role-reload": "full",
-    "role-list": "full"
+    "role-list": "full",
+    "rolelist": "full"
   },
 
   "main-menu": {
