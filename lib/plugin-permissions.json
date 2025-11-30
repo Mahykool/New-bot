@@ -22,7 +22,12 @@
   },
 
   "antilink": {
-    "antilink": "manage"
+    "antilink": "manage",
+    "on": "manage",
+    "off": "manage",
+    "status": "basic",
+    "toggle": "manage"
+
   },
 
   "welcome": {
@@ -46,5 +51,8 @@
   "owner-mute": {
     "shadowban": "manage",
     "unshadowban": "manage"
+  },
+  "__defaults__": {
+    "command": "manage"
   }
 }
