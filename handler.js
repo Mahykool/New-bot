@@ -1,6 +1,7 @@
 // handler.js
 import { smsg } from './lib/simple.js'
 import { format } from 'util'
+import { sendWelcomeOrBye } from './lib/welcome.js'
 import { fileURLToPath } from 'url'
 import path, { join } from 'path'
 import { unwatchFile, watchFile } from 'fs'
