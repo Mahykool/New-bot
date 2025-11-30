@@ -1,7 +1,5 @@
 // plugins/wm.js
-// Robo de stickers con sistema RESPECT
-// Requisitos: lib/sticker.js debe exportar addExif(buffer, pack, author) -> Buffer
-// Usa lib/db-respect.js para persistencia atómica y audit log
+// Robo de stickers con sistema RESPECT (integrado con permisos y roles)
 
 import { fileURLToPath } from 'url'
 import path from 'path'
@@ -12,21 +10,20 @@ import {
   ensureUserEntry,
   auditLog
 } from '../lib/db-respect.js'
+import { requireCommandAccess } from '../lib/permissions-middleware.js'
+import { normalizeJid, getUserRoles } from '../lib/lib-roles.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Configuración del sistema
-const WINDOW_MS = 5 * 60 * 1000 // 5 minutos
+const WINDOW_MS = 5 * 60 * 1000
 const MAX_ROBOS_WINDOW = 3
 const RESPECT_PER_ROB = 5
 
-// Sanitizar packname/author
 function sanitizeMeta(s = '') {
   return String(s || '').slice(0, 64).replace(/[\u0000-\u001F\u007F<>:"/\\|?*]/g, '').trim()
 }
 
-// Descarga normalizada del mensaje citado
 async function downloadQuoted(quoted, conn) {
   if (!quoted) throw new Error('No hay mensaje citado')
   const methods = [
@@ -45,12 +42,20 @@ async function downloadQuoted(quoted, conn) {
   throw new Error('No se pudo descargar el sticker con los métodos disponibles')
 }
 
-// Bloqueo por usuario para evitar race conditions
 const userLocks = new Set()
 
 const handler = async (m, { conn, text }) => {
   const ctxErr = global.rcanalx || {}
   const ctxOk = global.rcanalr || {}
+
+  // Validación de permisos para usar WM (opcional, si quieres restringir)
+  try {
+    const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+    requireCommandAccess(m, 'wm', 'wm', chatCfg)
+  } catch (e) {
+    try { const fail = global.dfail; if (fail) fail('access', m, conn) } catch {}
+    return
+  }
 
   if (!m.quoted) {
     return conn.reply
@@ -73,7 +78,8 @@ const handler = async (m, { conn, text }) => {
     author = sanitizeMeta(parts.slice(1).join('|') || '')
   }
 
-  const user = m.sender
+  const userRaw = m.sender
+  const user = normalizeJid(userRaw)
   if (!user) return conn.reply ? conn.reply(m.chat, '> No se pudo identificar al usuario.', m, ctxErr) : null
 
   if (userLocks.has(user)) {
@@ -82,7 +88,6 @@ const handler = async (m, { conn, text }) => {
   userLocks.add(user)
 
   try {
-    // Descargar sticker citado
     let imgBuffer = null
     try {
       imgBuffer = await downloadQuoted(m.quoted, conn)
@@ -95,7 +100,6 @@ const handler = async (m, { conn, text }) => {
       return conn.reply ? conn.reply(m.chat, '> El sticker descargado no es válido.', m, ctxErr) : null
     }
 
-    // Aplicar EXIF
     let stickerBuffer = null
     try {
       stickerBuffer = await addExif(imgBuffer, packname || '', author || '')
@@ -107,7 +111,6 @@ const handler = async (m, { conn, text }) => {
       return conn.reply ? conn.reply(m.chat, '> Error al procesar el sticker.', m, ctxErr) : null
     }
 
-    // Cargar DB, actualizar y guardar
     const db = loadRespectDB()
     ensureUserEntry(db, user)
     const now = Date.now()
@@ -135,7 +138,6 @@ const handler = async (m, { conn, text }) => {
 
     const robosDisponibles = Math.max(0, MAX_ROBOS_WINDOW - data.robCount)
 
-    // Enviar sticker modificado
     try {
       await conn.sendMessage(m.chat, { sticker: stickerBuffer }, { quoted: m })
     } catch (err) {
