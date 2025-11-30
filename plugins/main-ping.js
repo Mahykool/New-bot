@@ -3,8 +3,7 @@
 // Título personalizado: 'ㅤׄㅤׅㅤׄ _*DIAGNOSTICO*_ ㅤ֢ㅤׄㅤׅ'
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
-import { getRoleInfo } from '../lib/lib-roles.js'
-import { normalizeJid } from '../lib/lib-roles.js'
+import { getRoleInfo, normalizeJid } from '../lib/lib-roles.js'
 
 const DIAG_TITLE = 'ㅤׄㅤׅㅤׄ _*DIAGNOSTICO*_ ㅤ֢ㅤׄㅤׅ'
 
@@ -17,20 +16,26 @@ const formatUptime = (secs) => {
 
 let handler = async (m, { conn }) => {
   const ctxErr = (global.rcanalx || {})
-  const ctxWarn = (global.rcanalw || {})
   const ctxOk = (global.rcanalr || {})
 
   try {
-    // Control de acceso
+    // contexto de chat para whitelist por chat
+    const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+
+    // Control de acceso centralizado (usa requireCommandAccess)
     try {
-      requireCommandAccess(m.sender, 'main-ping', 'ping')
+      requireCommandAccess(m, 'main-ping', 'ping', chatCfg)
     } catch (err) {
-      return conn.reply(m.chat, '❌ No tienes permiso para ejecutar este comando.', m, ctxErr)
+      try { 
+        const fail = (m && (m.plugin && global.plugins?.[m.plugin]?.fail)) ? global.plugins[m.plugin].fail : global.dfail
+        if (fail) fail('access', m, conn)
+      } catch {}
+      return
     }
 
     // Normalizar sender y obtener info de rol
     const senderJid = (typeof normalizeJid === 'function') ? normalizeJid(m.sender) : (m.sender || '')
-    const roleInfo = getRoleInfo(senderJid) || {}
+    const roleInfo = (typeof getRoleInfo === 'function') ? getRoleInfo(senderJid) || {} : {}
     const roleLabel = `${roleInfo.icon || ''} ${roleInfo.name || roleInfo.id || 'user'}`.trim()
 
     // Medición de latencia (simple y no bloqueante)
@@ -108,7 +113,6 @@ ${emoji} *Latencia:* ${ping} ms
         ctxErr
       )
     } catch (e) {
-      // si falla el reply, al menos loguear
       console.error('Error enviando mensaje de error en ping:', e)
     }
   }
