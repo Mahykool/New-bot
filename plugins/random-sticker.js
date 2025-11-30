@@ -1,6 +1,6 @@
 // plugins/random-sticker.js
 // Envía stickers aleatorios desde ./stickers (webp|png|jpg|jpeg) o desde una lista de URLs en config.json
-// Soporta uso en grupos y en privado. Usa la carpeta de stickers en la raíz del proyecto: <proyecto>/stickers
+// Mejoras: robustez en fetch, manejo de buffers y fallback más claro
 
 import fs from 'fs'
 import path from 'path'
@@ -11,10 +11,13 @@ import { fileURLToPath } from 'url'
  * - Node 18+ tiene global.fetch
  * - Si no existe, intenta cargar node-fetch dinámicamente (si está instalado)
  */
-let fetchFn = null
-try { fetchFn = global.fetch } catch {}
+let fetchFn = globalThis.fetch || null
 if (!fetchFn) {
   try {
+    // Import dinámico de node-fetch si está disponible
+    // Si no está instalado, fetchFn quedará null y solo se usarán archivos locales
+    // (no se lanza error para no romper el plugin)
+    // eslint-disable-next-line no-undef
     fetchFn = (await import('node-fetch')).default
   } catch (e) {
     fetchFn = null
@@ -67,11 +70,19 @@ async function fetchToBuffer(url) {
   try {
     const res = await fetchFn(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    // node-fetch y fetch del navegador soportan arrayBuffer()
     const buf = await res.arrayBuffer()
     return Buffer.from(buf)
   } catch (e) {
     throw new Error(`fetchToBuffer failed: ${e?.message || e}`)
   }
+}
+
+/** Detectar si un buffer parece webp (primeros bytes) */
+function isWebpBuffer(buf) {
+  if (!buf || !Buffer.isBuffer(buf)) return false
+  // WebP files start with "RIFF" and "WEBP" in header
+  return buf.slice(0, 4).toString() === 'RIFF' && buf.slice(8, 12).toString() === 'WEBP'
 }
 
 /**
@@ -91,14 +102,17 @@ const handler = async (m, { conn }) => {
     }
 
     let chosenBuffer = null
+    let chosenFilePath = null
     const useLocal = Math.random() < 0.8 && local.length > 0 // 80% local si hay
     if (useLocal && local.length > 0) {
       const file = pickRandom(local)
       try {
         chosenBuffer = fs.readFileSync(file)
+        chosenFilePath = file
       } catch (e) {
         console.warn('random-sticker: failed read local file', file, e?.message || e)
         chosenBuffer = null
+        chosenFilePath = null
       }
     }
 
@@ -107,9 +121,11 @@ const handler = async (m, { conn }) => {
       const url = pickRandom(remote)
       try {
         chosenBuffer = await fetchToBuffer(url)
+        chosenFilePath = null
       } catch (e) {
         console.warn('random-sticker: failed fetch remote', e?.message || e)
         chosenBuffer = null
+        chosenFilePath = null
       }
     }
 
@@ -117,11 +133,14 @@ const handler = async (m, { conn }) => {
     if (!chosenBuffer && local.length > 0) {
       for (const file of local) {
         try {
-          chosenBuffer = fs.readFileSync(file)
-          if (chosenBuffer) break
+          const buf = fs.readFileSync(file)
+          if (buf && buf.length) {
+            chosenBuffer = buf
+            chosenFilePath = file
+            break
+          }
         } catch (e) {
           console.warn('random-sticker: fallback read failed', file, e?.message || e)
-          chosenBuffer = null
         }
       }
     }
@@ -133,9 +152,23 @@ const handler = async (m, { conn }) => {
     }
 
     // Intento principal: enviar como sticker (Baileys-like)
+    // Baileys suele aceptar { sticker: buffer } si el buffer es webp; si no, puede fallar.
     try {
-      await conn.sendMessage(m.chat, { sticker: chosenBuffer }, { quoted: m })
-      return null
+      if (isWebpBuffer(chosenBuffer)) {
+        // Buffer webp: enviar directamente como sticker
+        await conn.sendMessage(m.chat, { sticker: chosenBuffer }, { quoted: m })
+        return null
+      } else {
+        // No es webp: intentar enviar como sticker igualmente (algunos adaptadores convierten)
+        try {
+          await conn.sendMessage(m.chat, { sticker: chosenBuffer }, { quoted: m })
+          return null
+        } catch (e) {
+          // Fallback: enviar como imagen con caption
+          await conn.sendMessage(m.chat, { image: chosenBuffer, caption: 'Sticker' }, { quoted: m })
+          return null
+        }
+      }
     } catch (e) {
       console.warn('random-sticker: sendMessage sticker failed, intentando fallback', e?.message || e)
       // Fallback: enviar como imagen con caption
