@@ -1,39 +1,36 @@
 // plugins/group-antilink.js
-// Sistema Antilink Ultra Fuerte (versión actualizada para respetar roles)
+// Sistema Antilink Ultra Fuerte (parcheado: normalización, parseTarget, protecciones y robustez)
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { normalizeJid, getUserRoles, getRoleInfo } from '../lib/lib-roles.js'
+import { parseTarget } from '../lib/utils.js'
 
 const PROTECTED_ROLES = ['creador', 'mod'] // roles que no deben ser expulsados por antilink
 const DEFAULT_LINK_PATTERNS = [
-  /https?:\/\/[^\s]*/gi,
-  /www\.[^\s]*/gi,
+  /https?:\/\/[^\s]+/gi,
+  /www\.[^\s]+/gi,
   /[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(\/[^\s]*)?/gi,
   /wa\.me\/[0-9]+/gi,
   /chat\.whatsapp\.com\/[A-Za-z0-9]+/gi,
-  /t\.me\/[^\s]*/gi,
-  /instagram\.com\/[^\s]*/gi,
-  /facebook\.com\/[^\s]*/gi,
-  /youtube\.com\/[^\s]*/gi,
-  /youtu\.be\/[^\s]*/gi,
-  /twitter\.com\/[^\s]*/gi,
-  /x\.com\/[^\s]*/gi,
-  /discord\.gg\/[^\s]*/gi,
-  /tiktok\.com\/[^\s]*/gi,
-  /bit\.ly\/[^\s]*/gi,
-  /tinyurl\.com\/[^\s]*/gi,
-  /goo\.gl\/[^\s]*/gi,
-  /wa\.me\/[0-9]+/gi
+  /t\.me\/[^\s]+/gi,
+  /instagram\.com\/[^\s]+/gi,
+  /facebook\.com\/[^\s]+/gi,
+  /youtube\.com\/[^\s]+/gi,
+  /youtu\.be\/[^\s]+/gi,
+  /twitter\.com\/[^\s]+/gi,
+  /x\.com\/[^\s]+/gi,
+  /discord\.gg\/[^\s]+/gi,
+  /tiktok\.com\/[^\s]+/gi,
+  /bit\.ly\/[^\s]+/gi,
+  /tinyurl\.com\/[^\s]+/gi,
+  /goo\.gl\/[^\s]+/gi
 ]
 
-/**
- * Plugin: group-antilink
- * - Comandos: antilink on|off|status
- * - Requiere permiso definido en plugin-permissions.json (group-antilink: antilink)
- * - Antes (before): detecta enlaces y actúa solo si la protección está activa y el remitente no es admin/rol protegido
- */
+function formatTitle() {
+  return 'ஓீ🐙 ㅤׄㅤׅㅤׄ *ANTILINK* ㅤ֢ㅤׄㅤׅ'
+}
 
-let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }) => {
+let handler = async (m, { conn, args = [], usedPrefix = '/', isAdmin, isBotAdmin }) => {
   const ctxErr = (global.rcanalx || {})
   const ctxWarn = (global.rcanalw || {})
   const ctxOk = (global.rcanalr || {})
@@ -44,7 +41,7 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
   try {
     requireCommandAccess(m.sender, 'group-antilink', 'antilink')
   } catch (e) {
-    if (e.code === 'ACCESS_DENIED') {
+    if (e && e.code === 'ACCESS_DENIED') {
       return conn.reply(m.chat, '> ❌ No tienes nivel suficiente para configurar el ANTILINK.', m, ctxErr)
     }
     throw e
@@ -55,14 +52,14 @@ let handler = async (m, { conn, args, usedPrefix, command, isAdmin, isBotAdmin }
     return conn.reply(m.chat, '⚠️ Solo los administradores del grupo pueden usar este comando.', m, ctxErr)
   }
 
-  const action = args[0]?.toLowerCase()
+  const action = (args[0] || '').toString().toLowerCase()
   if (!global.antilinkStatus) global.antilinkStatus = {}
 
   if (!action) {
     return conn.reply(
       m.chat,
       `
-ஓீ🐙 ㅤׄㅤׅㅤׄ *ANTILINK* ㅤ֢ㅤׄㅤׅ
+${formatTitle()}
 
 ➤ ${usedPrefix}antilink on
    Activa la protección contra enlaces.
@@ -114,7 +111,7 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
     if (!m || !m.isGroup) return
     if (!global.antilinkStatus || !global.antilinkStatus[m.chat]) return
 
-    const messageText = (m.text || m.caption || '') + ''
+    const messageText = ((m.text || m.caption) || '') + ''
     if (!messageText) return
 
     // Detectar enlace con patrones
@@ -135,40 +132,42 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
     if (isAdmin) return
 
     // Evitar actuar sobre el propio bot
-    const botJid = conn.user?.jid || conn.user?.id || ''
-    if (m.sender === botJid) return
+    const botJid = normalizeJid(conn.user?.jid || conn.user?.id || '')
+    const senderJid = normalizeJid(m.sender)
+    if (!senderJid || senderJid === botJid) return
 
-    // Comprobar roles del remitente: si tiene rol protegido, no expulsar
+    // Comprobar roles del remitente: si tiene rol protegido, no actuar
     try {
-      const senderRoles = (getUserRoles(m.sender) || []).map(r => String(r).toLowerCase())
-      const senderRoleInfo = getRoleInfo(m.sender) || {}
-      // Si el remitente tiene alguno de los roles protegidos, no actuar
+      const senderRoles = (getUserRoles(senderJid) || []).map(r => String(r).toLowerCase())
+      const senderRoleInfo = getRoleInfo(senderJid) || {}
       for (const pr of PROTECTED_ROLES) {
         if (senderRoles.includes(pr)) return
       }
-      // También si su rol principal es protegido por nombre
       if (PROTECTED_ROLES.includes((senderRoleInfo.id || '').toLowerCase())) return
     } catch (e) {
-      // si falla la comprobación de roles, seguimos con precaución (no bloquear por defecto)
+      // si falla la comprobación de roles, no bloqueamos por defecto; seguimos con precaución
     }
 
     // Aviso público con mención
-    await conn.sendMessage(
-      m.chat,
-      {
-        text: `> 💢 𝐄𝐍𝐋𝐀𝐂𝐄 𝐃𝐄𝐓𝐄𝐂𝐓𝐀𝐃𝐎 @${m.sender.split('@')[0]} ⚠️ 𝐀𝐂𝐂𝐈𝐎́𝐍`,
-        mentions: [m.sender]
-      }
-    )
+    try {
+      await conn.sendMessage(
+        m.chat,
+        {
+          text: `> 💢 𝐄𝐍𝐋𝐀𝐂𝐄 𝐃𝐄𝐓𝐄𝐂𝐓𝐀𝐃𝐎 @${senderJid.split('@')[0]} ⚠️ 𝐀𝐂𝐂𝐈𝐎́𝐍`,
+          mentions: [senderJid]
+        }
+      )
+    } catch (e) {
+      // no crítico
+    }
 
     // Intentar borrar el mensaje con fallbacks compatibles
     try {
-      // Baileys-like deleteMessage
       if (typeof conn.deleteMessage === 'function') {
         try { await conn.deleteMessage(m.chat, m.key) } catch (e) {}
       } else if (typeof conn.sendMessage === 'function') {
         try {
-          await conn.sendMessage(m.chat, { delete: { remoteJid: m.chat, fromMe: false, id: m.key?.id, participant: m.sender } })
+          await conn.sendMessage(m.chat, { delete: { remoteJid: m.chat, fromMe: false, id: m.key?.id, participant: senderJid } })
         } catch (e) {}
       }
     } catch (e) {
@@ -179,11 +178,13 @@ handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
     if (isBotAdmin) {
       try {
         if (typeof conn.groupParticipantsUpdate === 'function') {
-          await conn.groupParticipantsUpdate(m.chat, [m.sender], 'remove')
+          await conn.groupParticipantsUpdate(m.chat, [senderJid], 'remove')
         } else if (typeof conn.groupRemove === 'function') {
-          await conn.groupRemove(m.chat, [m.sender])
+          await conn.groupRemove(m.chat, [senderJid])
+        } else if (typeof conn.groupParticipants === 'function') {
+          await conn.groupParticipants(m.chat, [senderJid], 'remove')
         } else {
-          // fallback: no hay método de expulsión conocido
+          // no hay método de expulsión conocido
         }
       } catch (e) {
         console.error('Expulsión fallida (antilink):', e)
