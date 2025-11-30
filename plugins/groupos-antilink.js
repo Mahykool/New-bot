@@ -1,18 +1,12 @@
-// plugins/group-antilink.js — Versión PRO
-// Antilink con shadowban progresivo, kick, roles protegidos y auto-detección silenciosa
+// plugins/group-antilink.js — Versión PRO con fix de JID
+// Antilink con shadowban progresivo, kick, borrado, roles protegidos y auto-detección silenciosa
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { normalizeJid, getUserRoles } from '../lib/lib-roles.js'
 
-/* ============================
-   CONFIGURACIÓN
-============================ */
 const PROTECTED_ROLES = ['creador', 'owner', 'mod', 'admin', 'staff']
 const STRIKE_RESET_HOURS = 24
 
-// 1er link → shadowban 5m
-// 2do link → shadowban 15m
-// 3er link → kick
 const STRIKE_ACTIONS = {
   1: { type: 'shadowban', minutes: 5 },
   2: { type: 'shadowban', minutes: 15 },
@@ -35,24 +29,19 @@ const LINK_PATTERNS = [
 ]
 
 function formatTitle() {
-  return 'ㅤׄㅤׅㅤׄ _*ANTILINK*_ ㅤ֢ㅤׄㅤׅ'
+  return 'ㅤׄㅤׅㅤׄ _*ANTILINK*_ ㅤ֢ㅤㅤׅ'
 }
 
-/* ============================
-   STRIKES
-============================ */
 if (!global.antilinkStrikes) global.antilinkStrikes = {}
 
 function getStrikes(chat, user) {
   const key = `${chat}:${user}`
   const entry = global.antilinkStrikes[key]
-
   if (!entry) return 0
 
   const now = Date.now()
   const diff = now - entry.timestamp
   const resetMs = STRIKE_RESET_HOURS * 60 * 60 * 1000
-
   if (diff > resetMs) {
     delete global.antilinkStrikes[key]
     return 0
@@ -64,20 +53,15 @@ function getStrikes(chat, user) {
 function addStrike(chat, user) {
   const key = `${chat}:${user}`
   const now = Date.now()
-
   if (!global.antilinkStrikes[key]) {
     global.antilinkStrikes[key] = { count: 1, timestamp: now }
   } else {
     global.antilinkStrikes[key].count++
     global.antilinkStrikes[key].timestamp = now
   }
-
   return global.antilinkStrikes[key].count
 }
 
-/* ============================
-   COMANDO PRINCIPAL
-============================ */
 let handler = async (m, { conn, args, usedPrefix, isAdmin }) => {
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
 
@@ -131,63 +115,63 @@ let handler = async (m, { conn, args, usedPrefix, isAdmin }) => {
   }
 }
 
-/* ============================
-   DETECTOR (before)
-============================ */
 handler.before = async (m, { conn, isAdmin, isBotAdmin }) => {
   try {
-    if (!m.isGroup) return
-    if (!global.antilinkStatus[m.chat]) return
+    if (!m.isGroup || !global.antilinkStatus?.[m.chat]) return
 
     const text = (m.text || m.caption || '').trim()
     if (!text) return
 
-    // Detectar enlace
     let hasLink = LINK_PATTERNS.some(p => p.test(text))
     if (!hasLink) return
 
-    const sender = normalizeJid(m.sender)
-    const botJid = normalizeJid(conn.user?.id)
+    const sender = normalizeJid(m.sender || m.participant || '')
+    if (!sender || typeof sender !== 'string') return
 
+    const botJid = normalizeJid(conn.user?.id)
     if (sender === botJid) return
     if (isAdmin) return
 
-    // Roles protegidos
-    const roles = (getUserRoles(sender) || []).map(r => r.toLowerCase())
+    let roles = []
+    try {
+      roles = getUserRoles(sender).map(r => r.toLowerCase())
+    } catch (e) {
+      console.warn('Antilink: error al obtener roles de', sender, e)
+    }
+
     if (roles.some(r => PROTECTED_ROLES.includes(r))) return
 
-    // Borrar mensaje
+    try {
+      await conn.sendMessage(m.chat, {
+        text: `${formatTitle()}\n⚠️ *ENLACE DETECTADO*\nUsuario: @${sender.split('@')[0]}`,
+        mentions: [sender]
+      })
+    } catch {}
+
     try {
       if (typeof conn.deleteMessage === 'function') {
         await conn.deleteMessage(m.chat, m.key)
       } else {
-        await conn.sendMessage(m.chat, { delete: m.key })
+        await conn.sendMessage(m.chat, {
+          delete: {
+            remoteJid: m.chat,
+            fromMe: false,
+            id: m.key?.id,
+            participant: sender
+          }
+        })
       }
     } catch {}
 
-    // Registrar strike
     const strikes = addStrike(m.chat, sender)
     const action = STRIKE_ACTIONS[strikes] || STRIKE_ACTIONS[3]
 
     const tag = `@${sender.split('@')[0]}`
+    const msg = `${formatTitle()}\n⚠️ *ENLACE DETECTADO*\nUsuario: ${tag}\nStrike: *${strikes}/3*\nAcción: *${action.type === 'kick' ? 'Expulsión' : 'Shadowban ' + action.minutes + 'm'}*`
 
-    // Aviso SW
-    await conn.sendMessage(
-      m.chat,
-      {
-        text:
-`${formatTitle()}
-⚠️ *ENLACE DETECTADO*
-Usuario: ${tag}
-Strike: *${strikes}/3*
-Acción: *${action.type === 'kick' ? 'Expulsión' : 'Shadowban ' + action.minutes + 'm'}*`,
-        mentions: [sender]
-      }
-    )
+    await conn.sendMessage(m.chat, { text: msg, mentions: [sender] })
 
-    // Aplicar castigo
     if (action.type === 'shadowban') {
-      // Invocar plugin shadowban
       const fake = {
         ...m,
         text: `.shadowban @${sender.split('@')[0]} ${action.minutes}`,
@@ -224,7 +208,7 @@ Acción: *${action.type === 'kick' ? 'Expulsión' : 'Shadowban ' + action.minute
 handler.command = ['antilink']
 handler.tags = ['modmenu']
 handler.group = true
-handler.botAdmin = false   // ✅ No exige admin para usarlo (solo para expulsar)
+handler.botAdmin = false
 handler.admin = false
 
 export default handler
