@@ -6,8 +6,7 @@ import {
   setUserRole,
   addUserRole,
   removeUserRole,
-  getUserRoles,
-  getUserRolesMap
+  reloadUserRoles
 } from '../lib/lib-roles.js'
 
 const format = txt => `*ROLES* — ${txt}`
@@ -31,7 +30,7 @@ const handler = async (m, { conn }) => {
     const [, , target, roleId] = btn.split(':')
 
     const updated = setUserRole(target, roleId, actor)
-    try { global.userRoles = getUserRolesMap() } catch {}
+    try { global.userRoles = reloadUserRoles() } catch {}
 
     const rolesStr = updated.length ? updated.join(', ') : 'none'
     const name = await conn.getName(target)
@@ -56,7 +55,7 @@ const handler = async (m, { conn }) => {
     const [, , target, roleId] = btn.split(':')
 
     const updated = addUserRole(target, roleId, actor)
-    try { global.userRoles = getUserRolesMap() } catch {}
+    try { global.userRoles = reloadUserRoles() } catch {}
 
     const rolesStr = updated.length ? updated.join(', ') : 'none'
     const name = await conn.getName(target)
@@ -81,7 +80,7 @@ const handler = async (m, { conn }) => {
     const [, , target, roleId] = btn.split(':')
 
     const updated = removeUserRole(target, roleId, actor)
-    try { global.userRoles = getUserRolesMap() } catch {}
+    try { global.userRoles = reloadUserRoles() } catch {}
 
     const rolesStr = updated.length ? updated.join(', ') : 'none'
     const name = await conn.getName(target)
