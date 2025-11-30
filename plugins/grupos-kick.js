@@ -1,26 +1,19 @@
 // plugins/group/kick.js
 // SW SYSTEM — Group Kick (versión corregida y endurecida)
+// Parche: usa parseTarget central, normaliza JIDs con lib-roles y mejora validaciones
 
 import { requireCommandAccess } from '../../lib/permissions-middleware.js'
 import { getRoleInfo, normalizeJid as normalizeJidLib } from '../../lib/lib-roles.js'
+import { parseTarget } from '../../lib/utils.js'
 
 /**
  * Kick handler mejorado
- * - Normaliza JIDs
- * - Soporta menciones, reply y número en argumentos
+ * - Normaliza JIDs usando normalizeJid desde lib-roles
+ * - Soporta menciones, reply y número en argumentos (vía parseTarget)
  * - Verifica permisos: requireCommandAccess, bot admin, sender admin/creador
  * - Protecciones: no expulsar al bot, al owner del grupo, ni al owner del bot; evita expulsar mods/creadores según roles internos
  * - Usa groupParticipantsUpdate con fallback y manejo de errores detallado
  */
-
-const normalizeJid = jid => {
-  if (!jid) return jid
-  if (typeof jid !== 'string') jid = String(jid)
-  jid = jid.trim()
-  // si ya contiene @ lo devolvemos tal cual, si no asumimos número y añadimos dominio
-  if (jid.includes('@')) return jid.split(':')[0].split('/')[0]
-  return `${jid}@s.whatsapp.net`
-}
 
 const firstOwnerJid = () => {
   try {
@@ -47,19 +40,9 @@ const handler = async (m, { conn, participants = [], usedPrefix = '', command = 
     return conn.reply(m.chat, '> ❌ No tienes permiso para usar este comando.', m)
   }
 
-  // Determinar objetivo: menciones > reply > argumento (número o jid)
-  let user = null
-  if (Array.isArray(m.mentionedJid) && m.mentionedJid.length) {
-    user = normalizeJid(m.mentionedJid[0])
-  } else if (m.quoted && (m.quoted.sender || m.quoted.participant)) {
-    user = normalizeJid(m.quoted.sender || m.quoted.participant)
-  } else {
-    const text = (m.text || '').trim()
-    const parts = text.split(/\s+/)
-    if (parts.length > 1) {
-      user = normalizeJid(parts[1])
-    }
-  }
+  // Resolver objetivo con parseTarget (mención, reply, número, args)
+  const targetRaw = parseTarget(m, (m?.text || '').trim().split(/\s+/).slice(1))
+  const user = targetRaw ? normalizeJidLib(targetRaw) : null
 
   if (!user) {
     return conn.reply(m.chat, `> ❌ Debes mencionar o responder a un usuario para expulsarlo.\nUso: ${usedPrefix || ''}kick @usuario`, m)
@@ -68,36 +51,36 @@ const handler = async (m, { conn, participants = [], usedPrefix = '', command = 
   try {
     // Metadata del grupo (fallback si no se pasa participants)
     const groupInfo = typeof conn.groupMetadata === 'function' ? await conn.groupMetadata(m.chat) : null
-    const ownerGroup = groupInfo?.owner ? normalizeJid(groupInfo.owner) : null
+    const ownerGroup = groupInfo?.owner ? normalizeJidLib(groupInfo.owner) : null
     const ownerBot = firstOwnerJid()
-    const botJid = normalizeJid(conn.user?.jid || conn.user?.id || '')
+    const botJid = normalizeJidLib(conn.user?.jid || conn.user?.id || '')
 
     // Roles internos
     const targetRole = getRoleInfo(user) || {}
-    const senderRole = getRoleInfo(m.sender) || {}
-    const targetRoleId = targetRole.id || null
-    const senderRoleId = senderRole.id || null
-    const targetIsCreador = targetRoleId === 'creador'
-    const targetIsMod = targetRoleId === 'mod'
-    const senderIsCreador = senderRoleId === 'creador'
+    const senderRole = getRoleInfo(normalizeJidLib(m.sender)) || {}
+    const targetRoleId = (targetRole.id || '').toString().toLowerCase()
+    const senderRoleId = (senderRole.id || '').toString().toLowerCase()
+    const targetIsCreador = ['creador', 'creator', 'owner'].includes(targetRoleId)
+    const targetIsMod = ['mod', 'moderator', 'moderador'].includes(targetRoleId)
+    const senderIsCreador = ['creador', 'creator', 'owner'].includes(senderRoleId)
 
     // Participantes del grupo (si se pasó por el framework)
-    const targetInGroup = Array.isArray(participants) ? participants.find(p => normalizeJid(p.id || p.jid) === normalizeJid(user)) : null
-    const senderInGroup = Array.isArray(participants) ? participants.find(p => normalizeJid(p.id || p.jid) === normalizeJid(m.sender)) : null
+    const targetInGroup = Array.isArray(participants) ? participants.find(p => normalizeJidLib(p.id || p.jid) === user) : null
+    const senderInGroup = Array.isArray(participants) ? participants.find(p => normalizeJidLib(p.id || p.jid) === normalizeJidLib(m.sender)) : null
 
-    const isTargetAdmin = !!(targetInGroup && (targetInGroup.admin === 'admin' || targetInGroup.admin === 'superadmin'))
-    const isSenderAdmin = !!(senderInGroup && (senderInGroup.admin === 'admin' || senderInGroup.admin === 'superadmin'))
+    const isTargetAdmin = !!(targetInGroup && (targetInGroup.admin === 'admin' || targetInGroup.admin === 'superadmin' || targetInGroup.isAdmin))
+    const isSenderAdmin = !!(senderInGroup && (senderInGroup.admin === 'admin' || senderInGroup.admin === 'superadmin' || senderInGroup.isAdmin))
 
     // Protecciones absolutas
-    if (normalizeJid(user) === normalizeJid(botJid)) {
+    if (user === botJid) {
       return conn.reply(m.chat, `> ❌ No puedo eliminarme a mí mismo del grupo.`, m)
     }
 
-    if (ownerGroup && normalizeJid(user) === normalizeJid(ownerGroup)) {
+    if (ownerGroup && user === ownerGroup) {
       return conn.reply(m.chat, `> ❌ No puedo eliminar al propietario del grupo.`, m)
     }
 
-    if (ownerBot && normalizeJid(user) === normalizeJid(ownerBot)) {
+    if (ownerBot && user === ownerBot) {
       return conn.reply(m.chat, `> ❌ No puedo eliminar al propietario del bot.`, m)
     }
 
@@ -131,11 +114,11 @@ const handler = async (m, { conn, participants = [], usedPrefix = '', command = 
     // Si no se pasó participants, intentamos inferir desde groupInfo
     let botIsAdmin = false
     if (Array.isArray(participants) && participants.length) {
-      const botInGroup = participants.find(p => normalizeJid(p.id || p.jid) === normalizeJid(botJid))
-      botIsAdmin = !!(botInGroup && (botInGroup.admin === 'admin' || botInGroup.admin === 'superadmin'))
+      const botInGroup = participants.find(p => normalizeJidLib(p.id || p.jid) === botJid)
+      botIsAdmin = !!(botInGroup && (botInGroup.admin === 'admin' || botInGroup.admin === 'superadmin' || botInGroup.isAdmin))
     } else if (groupInfo && groupInfo.participants) {
-      const botInGroup = groupInfo.participants.find(p => normalizeJid(p.id || p.jid) === normalizeJid(botJid))
-      botIsAdmin = !!(botInGroup && (botInGroup.admin === 'admin' || botInGroup.admin === 'superadmin'))
+      const botInGroup = groupInfo.participants.find(p => normalizeJidLib(p.id || p.jid) === botJid)
+      botIsAdmin = !!(botInGroup && (botInGroup.admin === 'admin' || botInGroup.admin === 'superadmin' || botInGroup.isAdmin))
     }
 
     if (!botIsAdmin) {
@@ -158,8 +141,8 @@ const handler = async (m, { conn, participants = [], usedPrefix = '', command = 
       await conn.sendMessage(
         m.chat,
         {
-          text: `> ⛔️ @${normalizeJid(user).split('@')[0]} ha sido expulsado del grupo ✅`,
-          mentions: [normalizeJid(user)]
+          text: `> ⛔️ @${user.split('@')[0]} ha sido expulsado del grupo ✅`,
+          mentions: [user]
         },
         { quoted: m }
       )
