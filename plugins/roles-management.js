@@ -116,11 +116,11 @@ ${usedPrefix}removerole @usuario <rol>
 ${usedPrefix}setpluginrole <rol> <pluginId> <nivel>  
 → Configura el nivel de acceso de un rol para un plugin específico.
 
-${usedPrefix}role reload  
-→ Recarga todos los roles desde los archivos del sistema.
-
-${usedPrefix}role list @usuario  
+${usedPrefix}rolelist  (o ${usedPrefix}role list / ${usedPrefix}role-list)  
 → Muestra todos los roles asignados a un usuario.
+
+${usedPrefix}role reload  (o ${usedPrefix}role-reload)  
+→ Recarga todos los roles desde los archivos del sistema.
 
 ━━━━━━━━━━━━━━━━━━
 📚 *Roles disponibles:*
@@ -312,8 +312,8 @@ ${all.map(r => `- ${r}`).join('\n')}
     )
   }
 
-  // role reload
-  if (cmd === 'role' && args[0] === 'reload') {
+  // role reload (soporta variantes: "role reload", "role-reload")
+  if (cmd === 'role-reload') {
     requireCommandAccess(m.sender, 'roles-management', 'role-reload')
 
     reloadRoles?.()
@@ -322,13 +322,13 @@ ${all.map(r => `- ${r}`).join('\n')}
     return conn.reply(m.chat, format('Roles recargados desde disco.'), m, ctxOk)
   }
 
-  // role list
-  if (cmd === 'role' && args[0] === 'list') {
+  // role list (soporta variantes: "role list", "role-list", "rolelist")
+  if (cmd === 'role-list' || cmd === 'rolelist') {
     requireCommandAccess(m.sender, 'roles-management', 'role-list')
 
-    const target = parseTarget(m, args.slice(1))
+    const target = parseTarget(m, args)
     if (!target)
-      return conn.reply(m.chat, format('Uso: .role list @usuario'), m, ctxWarn)
+      return conn.reply(m.chat, format('Uso: .rolelist @usuario'), m, ctxWarn)
 
     const roles = getUserRoles(target)
     const info = getRoleInfo(target)
@@ -340,6 +340,39 @@ Principal: ${info.name || info.id}
 `.trim()
 
     return conn.reply(m.chat, format(text), m, ctxOk)
+  }
+
+  // legacy: support "role <subcommand>" (space) for backward compatibility
+  if (cmd === 'role') {
+    // role reload
+    if (args[0] === 'reload') {
+      requireCommandAccess(m.sender, 'roles-management', 'role-reload')
+
+      reloadRoles?.()
+      try { global.userRoles = getUserRolesMap() } catch {}
+
+      return conn.reply(m.chat, format('Roles recargados desde disco.'), m, ctxOk)
+    }
+
+    // role list
+    if (args[0] === 'list') {
+      requireCommandAccess(m.sender, 'roles-management', 'role-list')
+
+      const target = parseTarget(m, args.slice(1))
+      if (!target)
+        return conn.reply(m.chat, format('Uso: .role list @usuario'), m, ctxWarn)
+
+      const roles = getUserRoles(target)
+      const info = getRoleInfo(target)
+
+      const text = `
+Usuario: ${target}
+Roles: ${roles.join(', ')}
+Principal: ${info.name || info.id}
+`.trim()
+
+      return conn.reply(m.chat, format(text), m, ctxOk)
+    }
   }
 }
 
@@ -358,7 +391,10 @@ handler.command = [
   'addrole',
   'removerole',
   'setpluginrole',
-  'role'
+  'role',
+  'role-reload',
+  'role-list',
+  'rolelist'
 ]
 
 export default handler
