@@ -2,7 +2,7 @@
 /**
  * CONTROL DE WELCOME — SW SYSTEM
  * DESARROLLADO POR: Mahykol
- * VERSIÓN: 3.8.0
+ * VERSIÓN: 3.8.1 (parche: normalización de acciones)
  */
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
@@ -32,22 +32,27 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
     throw e
   }
 
-  // 🔓 Ya NO exigimos isAdmin:
-  // if (!isAdmin) return ...
-
+  // Normalizar acción: aceptar muchas variantes
   const parts = (m.text || '').trim().split(/\s+/)
-  const action = (parts[1] || '').toLowerCase()
+  let action = (parts[1] || '').toString().toLowerCase().replace(/\s+/g, '')
+
+  // Mapear alias comunes a 'on' / 'off' / 'status'
+  if (['1', 'true', 'enable', 'activar', 'activarwelcome', 'activar-welcome', 'on'].includes(action)) action = 'on'
+  else if (['0', 'false', 'disable', 'desactivar', 'desactivarwelcome', 'desactivar-welcome', 'off'].includes(action)) action = 'off'
+  else if (['status', 'estado', 'estadowelcome', 'welcomestatus', 'statuswelcome'].includes(action)) action = 'status'
+  // si no hay acción explícita, action quedará '' y se mostrará ayuda
+
   const jid = m.chat
 
   try {
     const { setWelcomeState, isWelcomeEnabled } = await import('../lib/welcome.js')
 
-    if (action === 'on' || action === 'activar') {
+    if (action === 'on') {
       setWelcomeState(jid, true)
       return conn.reply(
         m.chat,
         [
-          'ஓீ🐙 ㅤׄㅤׅㅤׄ *WELCOME* ㅤ֢ㅤׄㅤׅ',
+          'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
           '',
           '✅ *ACTIVADO*',
           '',
@@ -58,12 +63,12 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
         m,
         ctxOk
       )
-    } else if (action === 'off' || action === 'desactivar') {
+    } else if (action === 'off') {
       setWelcomeState(jid, false)
       return conn.reply(
         m.chat,
         [
-          'ஓீ🐙 ㅤׄㅤׅㅤׄ *WELCOME* ㅤ֢ㅤׄㅤׅ',
+          'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
           '',
           '❌ *DESACTIVADO*',
           '',
@@ -74,12 +79,12 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
         m,
         ctxErr
       )
-    } else if (action === 'status' || action === 'estado') {
+    } else if (action === 'status') {
       const status = isWelcomeEnabled(jid) ? '🟢 ACTIVADO' : '🔴 DESACTIVADO'
       return conn.reply(
         m.chat,
         [
-          'ஓீ🐙 ㅤׄㅤׅㅤׄ *WELCOME* ㅤ֢ㅤׄㅤׅ',
+          'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
           '',
           '📊 *ESTADO DEL WELCOME*',
           '',
@@ -99,7 +104,7 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
       return conn.reply(
         m.chat,
         [
-          'ஓீ🐙 ㅤׄㅤׅㅤׄ *WELCOME* ㅤ֢ㅤׄㅤׅ',
+          'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
           '',
           '⚙️ *CONFIGURACIÓN DEL WELCOME*',
           '',
@@ -108,7 +113,9 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
           `• ${usedPrefix}welcome off — Desactivar welcome`,
           `• ${usedPrefix}welcome status — Ver estado`,
           '',
-          '✦ SW SYSTEM v3.8.0'
+          'Alias aceptados: on/off, enable/disable, 1/0, activar/desactivar',
+          '',
+          '✦ SW SYSTEM v3.8.1'
         ].join('\n'),
         m,
         ctxWarn
@@ -134,7 +141,7 @@ let handler = async (m, { conn, usedPrefix, command, isAdmin, isBotAdmin }) => {
 handler.pluginId = 'group-welcome'
 handler.help = ['welcome']
 handler.tags = ['modmenu']
-handler.command = ['welcome', 'bienvenida']
+handler.command = ['welcome', 'bienvenida', 'welcomeon', 'welcomeoff', 'welcomestatus']
 handler.group = true
 handler.botAdmin = true
 
