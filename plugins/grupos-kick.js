@@ -184,7 +184,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
 }
 
 handler.help = ['ban']
-handler.tags = ['group']
+handler.tags = ['mod']
 handler.command = ['kick', 'echar', 'sacar', 'ban']
 handler.group = true
 handler.botAdmin = false
