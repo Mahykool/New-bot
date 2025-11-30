@@ -15,6 +15,7 @@ import { sendWelcomeOrBye } from './lib/welcome.js'
 import { loadDatabase, saveDatabase, DB_PATH } from './lib/db.js'
 import { watchFile } from 'fs'
 import { yukiJadiBot } from './plugins/sockets-serbot.js'
+import { getUserRolesMap, saveUserRolesMap, normalizeJid } from './lib/lib-roles.js' // <-- import añadido para sincronización
 
 const phoneUtil = (libPhoneNumber.PhoneNumberUtil || libPhoneNumber.default?.PhoneNumberUtil).getInstance()
 
@@ -132,6 +133,30 @@ try {
   console.log(dbInfo)
 } catch {}
 await loadPlugins()
+
+// -----------------------------
+// Sincronización automática de owners desde config.js a user-roles.json
+// Se ejecuta una vez al inicio para garantizar que los owners estén en la base operativa
+try {
+  const users = getUserRolesMap()
+  const ownersFromConfig = []
+    .concat(global.roowner || [])
+    .concat(global.owner || [])
+    .flat()
+    .map(o => Array.isArray(o) ? o[0] : (o.jid || o))
+    .filter(Boolean)
+    .map(normalizeJid)
+
+  for (const jid of ownersFromConfig) {
+    users[jid] = users[jid] || []
+    if (!users[jid].includes('creador')) users[jid].push('creador')
+  }
+  saveUserRolesMap(users)
+  console.log('Owners sincronizados a user-roles.json')
+} catch (e) {
+  console.warn('syncOwnersToUserRoles error', e?.message || e)
+}
+// -----------------------------
 
 // Muestra una muestra de comandos indexados (temporal, útil para verificar normalización)
 try {
