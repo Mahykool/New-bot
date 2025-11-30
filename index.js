@@ -138,14 +138,20 @@ await loadPlugins()
 // Sincronización automática de owners desde config.js a user-roles.json
 // Se ejecuta una vez al inicio para garantizar que los owners estén en la base operativa
 try {
-  const users = getUserRolesMap()
-  const ownersFromConfig = []
-    .concat(global.roowner || [])
-    .concat(global.owner || [])
-    .flat()
-    .map(o => Array.isArray(o) ? o[0] : (o.jid || o))
-    .filter(Boolean)
-    .map(normalizeJid)
+const users = getUserRolesMap()
+const ownersFromConfig = []
+  .concat(global.roowner || [])
+  .concat(global.owner || [])
+  .flat()
+  .map(o => {
+    if (!o) return null
+    if (Array.isArray(o)) return o[0]
+    if (typeof o === 'object' && o.jid) return o.jid
+    if (typeof o === 'string') return o
+    return null
+  })
+  .filter(Boolean)
+  .map(normalizeJid)
 
   for (const jid of ownersFromConfig) {
     users[jid] = users[jid] || []
