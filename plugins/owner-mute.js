@@ -1,5 +1,6 @@
 // plugins/owner-mute.js
 // SW SYSTEM — Shadowban / Owner Mute (versión corregida, normalizada y con mejoras)
+// - Integración con sistema de roles y permisos (requireCommandAccess)
 // - Usa normalizeJid central desde lib-roles
 // - Mejor manejo de borrado de mensajes con múltiples fallbacks
 // - Logging de auditoría (append a data/shadowbans-audit.log)
@@ -203,7 +204,10 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   const ctxOk = global.rcanalr || {}
 
   try {
-    requireCommandAccess(m.sender, 'moderation-plugin', 'shadowban')
+    // contexto de chat para whitelist por chat
+    const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+    // uso correcto de requireCommandAccess: pasar el mensaje y chatCfg
+    requireCommandAccess(m, 'moderation-plugin', 'shadowban', chatCfg)
   } catch (err) {
     return conn.reply(m.chat, `${formatTitle()}\n❌ No tienes permiso para usar este comando.`, m, ctxErr)
   }
