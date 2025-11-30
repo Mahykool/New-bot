@@ -10,6 +10,7 @@ import {
   saveRespectDB,
   ensureUserEntry
 } from '../lib/db-respect.js'
+import { parseTarget } from '../lib/utils.js' // <-- import del helper central
 
 const DB_PATH = path.join(process.cwd(), 'database', 'respect.json')
 
@@ -71,7 +72,6 @@ const handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) =
 
   // respectreset
   if (cmd === 'respectreset') {
-    const target = (m.mentionedJid && m.mentionedJid[0]) || null
     const arg = (args[0] || '').toLowerCase()
 
     if (arg === 'all') {
@@ -86,6 +86,8 @@ const handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) =
       return conn.reply ? conn.reply(m.chat, '✦ Todos los registros de RESPECT han sido reiniciados.', m) : null
     }
 
+    // intentar resolver target (mención / respuesta / número / arg)
+    const target = parseTarget(m, args)
     if (!target) {
       return conn.reply ? conn.reply(m.chat,
         `✦ Usa:\n• ${usedPrefix}respectreset @usuario → resetear 1 usuario\n• ${usedPrefix}respectreset all → resetear todos`, m) : null
@@ -104,8 +106,23 @@ const handler = async (m, { conn, command = '', args = [], usedPrefix = '/' }) =
 
   // respectgive / respecttake / respectset
   if (['respectgive', 'respecttake', 'respectset'].includes(cmd)) {
-    const target = (m.mentionedJid && m.mentionedJid[0]) || null
-    const amount = parseInt(args[1])
+    // resolver target y cantidad
+    const target = parseTarget(m, args)
+    // extraer cantidad: primer token numérico en args o segundo token si se usó mención
+    let amount = null
+    // buscar en args cualquier número
+    for (const a of args) {
+      if (!a) continue
+      const n = parseInt(String(a).replace(/[^\d-]/g, ''), 10)
+      if (!isNaN(n)) { amount = n; break }
+    }
+    // si no hay en args, intentar extraer del texto del mensaje
+    if (amount === null) {
+      const body = (m?.text || m?.message?.conversation || m?.message?.extendedTextMessage?.text || '').toString()
+      const mnum = body.match(/(-?\d{1,6})/)
+      if (mnum) amount = parseInt(mnum[1], 10)
+    }
+
     if (!target || isNaN(amount)) {
       return conn.reply ? conn.reply(m.chat,
         `✦ Uso correcto:\n• ${usedPrefix}respectgive @usuario 50\n• ${usedPrefix}respecttake @usuario 20\n• ${usedPrefix}respectset @usuario 150`, m) : null
