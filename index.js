@@ -93,20 +93,26 @@ async function importAndIndexPlugin(fullPath) {
     const PLUGIN_DIR = path.join(__dirname, 'plugins')
     plug.__file = path.relative(PLUGIN_DIR, fullPath).replace(/\\/g, '/')
 
-    // normalizar comandos a minúsculas
-    if (Array.isArray(plug.command)) plug.command = plug.command.map(c => typeof c === 'string' ? c.toLowerCase() : c)
-    else if (typeof plug.command === 'string') plug.command = plug.command.toLowerCase()
+    // Normalizar comandos: minúsculas y eliminar espacios
+    if (Array.isArray(plug.command)) {
+      plug.command = plug.command
+        .map(c => typeof c === 'string' ? c.toLowerCase().replace(/\s+/g, '') : c)
+        .filter(c => typeof c === 'string' && c.length)
+    } else if (typeof plug.command === 'string') {
+      plug.command = plug.command.toLowerCase().replace(/\s+/g, '')
+    }
 
     // registrar plugin por su ruta relativa
     global.plugins[plug.__file] = plug
 
-    // indexar comandos para lookup rápido
+    // indexar comandos para lookup rápido (usar la versión normalizada)
     const cmds = []
     if (typeof plug.command === 'string') cmds.push(plug.command)
     else if (Array.isArray(plug.command)) cmds.push(...plug.command.filter(c => typeof c === 'string'))
 
     for (const c of cmds) {
-      const key = c.toLowerCase()
+      if (typeof c !== 'string') continue
+      const key = c.toLowerCase().replace(/\s+/g, '')
       if (!global.commandIndex[key]) global.commandIndex[key] = plug
     }
   } catch (e) {
@@ -126,6 +132,12 @@ try {
   console.log(dbInfo)
 } catch {}
 await loadPlugins()
+
+// Muestra una muestra de comandos indexados (temporal, útil para verificar normalización)
+try {
+  console.log('COMMAND INDEX SAMPLE:', Object.keys(global.commandIndex).slice(0, 200))
+} catch {}
+
 let handler
 try { ({ handler } = await import('./handler.js')) } catch (e) { console.error('[Handler] Error importando handler:', e.message) }
 
