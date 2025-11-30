@@ -183,7 +183,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   }
 }
 
-handler.help = ['kick']
+handler.help = ['ban']
 handler.tags = ['group']
 handler.command = ['kick', 'echar', 'sacar', 'ban']
 handler.group = true
