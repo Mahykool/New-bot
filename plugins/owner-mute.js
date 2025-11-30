@@ -4,17 +4,16 @@
 // - Mejor manejo de borrado de mensajes con múltiples fallbacks
 // - Logging de auditoría (append a data/shadowbans-audit.log)
 // - Uso consistente de ctx (rcanal*) y mensajes claros
+// - Usa parseTarget desde lib/utils.js para resolver menciones/respuestas/números
 
 import fs from 'fs'
 import path from 'path'
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import {
   normalizeJid,
-  getUserRoles,
-  addUserRole,
-  removeUserRole,
-  setUserRole
+  getUserRoles
 } from '../lib/lib-roles.js'
+import { parseTarget } from '../lib/utils.js'
 
 const DATA_DIR = path.join(process.cwd(), 'data')
 const FILE = path.join(DATA_DIR, 'shadowbans.json')
@@ -48,7 +47,7 @@ function loadShadowbansFromDisk() {
     if (!Array.isArray(arr)) return
     const now = Date.now()
     for (const item of arr) {
-      const jid = item.jid
+      const jid = item.jid ? normalizeJid(item.jid) : null
       const expiresAt = item.expiresAt || null
       const actor = item.actor || null
       const createdAt = item.createdAt || null
@@ -161,36 +160,6 @@ function hasRoleLocal(jid, role) {
   }
 }
 
-/* ---------- extracción robusta del target ---------- */
-function extractTargetJid(m) {
-  try {
-    if (m.quoted) {
-      const q = m.quoted
-      const candidate =
-        q.sender ||
-        q.participant ||
-        q.key?.participant ||
-        q.key?.remoteJid ||
-        (q.key?.fromMe && (q.key?.participant || q.key?.remoteJid)) ||
-        null
-      if (candidate) return normalizeJid(candidate)
-    }
-    if (Array.isArray(m.mentionedJid) && m.mentionedJid.length > 0) {
-      return normalizeJid(m.mentionedJid[0])
-    }
-    const text = (m.text || m.caption || '') + ''
-    const match = text.match(/@?(\+?\d{6,15})/g)
-    if (match && match.length > 0) {
-      const raw = match[0].replace('@', '').replace('+', '')
-      return normalizeJid(raw + '@s.whatsapp.net')
-    }
-    return null
-  } catch (e) {
-    console.warn('extractTargetJid error', e)
-    return null
-  }
-}
-
 /* ---------- carga inicial ---------- */
 loadShadowbansFromDisk()
 scheduleAllTimeouts()
@@ -213,7 +182,13 @@ async function tryDeleteMessage(conn, chat, key) {
         // ignore and try other fallbacks
       }
     }
-    // Some libs expose groupParticipantsUpdate or other methods; nothing else to do here
+    // Some libs expose revokeMessage
+    if (typeof conn.revokeMessage === 'function') {
+      try {
+        await conn.revokeMessage(chat, [key])
+        return true
+      } catch (e) {}
+    }
     return false
   } catch (e) {
     console.warn('tryDeleteMessage error', e)
@@ -235,7 +210,9 @@ const handler = async (m, { conn, usedPrefix, command }) => {
 
   try { await conn.reply(m.chat, msgUsage(), m, ctxWarn) } catch (e) {}
 
-  const target = extractTargetJid(m)
+  // resolver target con parseTarget (soporta mención, respuesta, número)
+  const rawTarget = parseTarget(m, [])
+  const target = rawTarget ? normalizeJid(rawTarget) : null
   if (!target) {
     return conn.reply(m.chat, `${formatTitle()}\n‼️ Responde al mensaje del usuario o menciónalo para aplicar shadowban/unshadowban.`, m, ctxWarn)
   }
@@ -250,7 +227,12 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   else if (global.ownerNumber) creators.push(global.ownerNumber)
 
   const normalizedCreators = creators
-    .map(o => { if (!o) return null; if (typeof o === 'string') return normalizeJid(o); if (Array.isArray(o) && o[0]) return normalizeJid(o[0]); return null })
+    .map(o => {
+      if (!o) return null
+      if (typeof o === 'string') return normalizeJid(o)
+      if (Array.isArray(o) && o[0]) return normalizeJid(o[0])
+      return null
+    })
     .filter(Boolean)
 
   // roles usando lib
@@ -261,7 +243,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   const isTargetModByRole = targetRoles.some(r => ['mod','moderator','moderador'].includes(r))
 
   const allBots = Array.isArray(global.allBots) ? global.allBots.slice() : (Array.isArray(global.botNumbers) ? global.botNumbers.slice() : [])
-  const normalizedAllBots = allBots.map(normalizeJid).filter(Boolean)
+  const normalizedAllBots = allBots.map(o => normalizeJid(o)).filter(Boolean)
 
   // protección creator (globals o rol)
   const isCreatorTarget = normalizedCreators.includes(target) || isTargetCreatorByRole
