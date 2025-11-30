@@ -1,14 +1,40 @@
-// ✦ Menú Oficial LATAM ✦ Swill v3.8.0 (parcheado: robustez y compatibilidad)
+// plugins/main-menu.js
+// ✦ Menú Oficial LATAM ✦ Swill v3.8.0 (parcheado: robustez, compatibilidad y permisos)
 // Diseñado por Mahykol ✦ Estilo GTA SA
-// Mejoras: manejo seguro de plugins faltantes, deduplicación, soporte opcional de imagen local,
-// uso seguro de conn.user.jid y protección contra plugins sin help/tags.
+// Cambios: integración con requireCommandAccess, muestra rol del solicitante, manejo seguro de plugins faltantes,
+// protección ante denegación de acceso (envía menú básico), y defensas adicionales.
 
 import { existsSync } from 'fs'
 import { join } from 'path'
 import { prepareWAMessageMedia, generateWAMessageFromContent, proto } from '@whiskeysockets/baileys'
+import { requireCommandAccess } from '../lib/permissions-middleware.js'
+import { getRoleInfo, normalizeJid } from '../lib/lib-roles.js'
 
 let handler = async (m, { conn, usedPrefix: _p = '/' }) => {
   try {
+    const ctxErr = (global.rcanalx || {})
+    const ctxOk = (global.rcanalr || {})
+
+    // contexto de chat para whitelist por chat
+    const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+
+    // Intentar validar acceso al plugin; si se deniega, enviamos un menú básico y no fallamos
+    try {
+      requireCommandAccess(m, 'main-menu', 'menu', chatCfg)
+    } catch (errAccess) {
+      try {
+        const fail = (m && (m.plugin && global.plugins?.[m.plugin]?.fail)) ? global.plugins[m.plugin].fail : global.dfail
+        if (fail) {
+          // llamar a dfail para mantener UX consistente
+          try { fail('access', m, conn) } catch {}
+        }
+      } catch {}
+      // Enviar menú básico y salir
+      const fallback = `🍙 *MENÚ BÁSICO*\n\n• ${_p}menu - Menú principal\n• ${_p}ping - Estado del bot\n• ${_p}prefijos - Ver prefijos\n\n⚠️ No tienes acceso al menú completo.`
+      try { await conn.sendMessage(m.chat, { text: fallback }, { quoted: m }) } catch {}
+      return
+    }
+
     // Recolectar ayuda desde plugins cargados (filtrar deshabilitados y entradas inválidas)
     const help = Object.values(global.plugins || {})
       .filter(p => p && !p.disabled)
@@ -17,9 +43,10 @@ let handler = async (m, { conn, usedPrefix: _p = '/' }) => {
         tags: Array.isArray(p.tags) ? p.tags.flat().filter(Boolean) : (p.tags ? [p.tags] : [])
       }))
 
-    // Encabezado
-    let menuText = `ஓீ🐙 ㅤׄㅤׅㅤׄ *MENUS* ㅤ֢ㅤׄㅤׅ\n\n`
+    // Encabezado y título
+    let menuText = `ஓீ🐙 ㅤׄㅤׅㅤׄ *MENÚS* ㅤ֢ㅤׄㅤׅ\n\n`
 
+    // Categorías y mapeo de tags a secciones
     const categories = {
       '*INFO*': ['main', 'info'],
       '*INTELIGENCIA*': ['bots', 'ia'],
@@ -38,7 +65,7 @@ let handler = async (m, { conn, usedPrefix: _p = '/' }) => {
 
     for (const catName of Object.keys(categories)) {
       const catTags = categories[catName]
-      const comandos = help.filter(menu => menu.tags.some(tag => catTags.includes(tag)))
+      const comandos = help.filter(menu => Array.isArray(menu.tags) && menu.tags.some(tag => catTags.includes(tag)))
       if (!comandos.length) continue
 
       menuText += `╭─ ${catName.replace(/\*/g, '')} ─╮\n`
@@ -76,11 +103,20 @@ let handler = async (m, { conn, usedPrefix: _p = '/' }) => {
           imageMessage: media.imageMessage
         })
       } catch (e) {
-        // si falla la carga, usar header sin media
         header = proto.Message.InteractiveMessage.Header.fromObject({ hasMediaAttachment: false })
       }
     } else {
       header = proto.Message.InteractiveMessage.Header.fromObject({ hasMediaAttachment: false })
+    }
+
+    // Obtener info de rol del solicitante para mostrar en footer o encabezado
+    let roleLabel = 'user'
+    try {
+      const senderJid = (typeof normalizeJid === 'function') ? normalizeJid(m.sender) : (m.sender || '')
+      const roleInfo = (typeof getRoleInfo === 'function') ? getRoleInfo(senderJid) || {} : {}
+      roleLabel = `${roleInfo.icon || ''} ${roleInfo.name || roleInfo.id || 'user'}`.trim()
+    } catch (e) {
+      roleLabel = 'user'
     }
 
     // Botones nativos (compatibilidad básica)
@@ -103,7 +139,7 @@ let handler = async (m, { conn, usedPrefix: _p = '/' }) => {
 
     const interactiveMessage = proto.Message.InteractiveMessage.fromObject({
       body: proto.Message.InteractiveMessage.Body.fromObject({ text: menuText }),
-      footer: proto.Message.InteractiveMessage.Footer.fromObject({ text: `ஓீ🐙 ㅤׄㅤׅㅤׄ *Swill-Bot* ㅤ֢ㅤׄㅤׄ` }),
+      footer: proto.Message.InteractiveMessage.Footer.fromObject({ text: `Rol: ${roleLabel} • Swill-Bot` }),
       header,
       nativeFlowMessage: proto.Message.InteractiveMessage.NativeFlowMessage.fromObject({
         buttons: nativeButtons
@@ -113,8 +149,18 @@ let handler = async (m, { conn, usedPrefix: _p = '/' }) => {
     // Asegurar userJid válido
     const userJid = (conn && (conn.user?.id || conn.user?.jid)) ? (conn.user.id || conn.user.jid) : (global?.botNumber ? `${global.botNumber}@s.whatsapp.net` : null)
 
-    const msg = generateWAMessageFromContent(m.chat, { interactiveMessage }, { userJid, quoted: m })
-    await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id })
+    // Generar y enviar mensaje interactivo con defensas
+    try {
+      const msg = generateWAMessageFromContent(m.chat, { interactiveMessage }, { userJid, quoted: m })
+      await conn.relayMessage(m.chat, msg.message, { messageId: msg.key.id })
+    } catch (e) {
+      // Fallback: enviar texto plano si la generación interactiva falla
+      try {
+        await conn.sendMessage(m.chat, { text: menuText + `\n\nRol: ${roleLabel}` }, { quoted: m })
+      } catch (err) {
+        console.error('Error enviando fallback del menú:', err)
+      }
+    }
   } catch (e) {
     console.error('❌ Error en el menú:', e)
     try {
@@ -130,6 +176,7 @@ let handler = async (m, { conn, usedPrefix: _p = '/' }) => {
 handler.help = ['menu','help']
 handler.tags = ['main']
 handler.command = ['Swill', 'menu', 'help']
+handler.pluginId = 'main-menu'
 
 handler.before = async function (m, { conn }) {}
 
