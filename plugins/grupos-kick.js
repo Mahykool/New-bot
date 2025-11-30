@@ -1,7 +1,11 @@
-// plugins/group-kick.js — Versión PRO FINAL
-// Kick con jerarquía real de roles, protección total del creador,
-// shadowban automático, expulsión sin admin si el bot tiene rol suficiente,
-// y compatibilidad total con SW SYSTEM.
+// plugins/group-kick.js — Versión PRO FINAL SW
+// Kick con:
+// ✅ Roles SW
+// ✅ Permisos SW
+// ✅ Jerarquía real
+// ✅ Shadowban REAL al intentar expulsar al creador
+// ✅ Expulsión sin admin si el bot tiene rol suficiente
+// ✅ Auditoría opcional
 
 import { normalizeJid, getUserRoles } from '../lib/lib-roles.js'
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
@@ -26,19 +30,25 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
   const actor = normalizeJid(m.sender)
 
-  /* --- PERMISOS POR ROL --- */
+  /* ============================
+     PERMISOS SW
+  ============================ */
   try {
     requireCommandAccess(m, 'group-kick', 'kick', chatCfg)
   } catch {
     return conn.reply(m.chat, `❌ No tienes permiso para usar este comando.`, m)
   }
 
-  /* --- AYUDA SOLO SI NO HAY TARGET --- */
+  /* ============================
+     AYUDA SI NO HAY TARGET
+  ============================ */
   if (!m.quoted && (!m.mentionedJid || m.mentionedJid.length === 0)) {
     try { await conn.reply(m.chat, msgUsage(), m) } catch {}
   }
 
-  /* --- RESOLVER TARGET --- */
+  /* ============================
+     RESOLVER TARGET
+  ============================ */
   let targetRaw = null
   try {
     const argsText = (m.text || '').trim().split(/\s+/).slice(1)
@@ -72,7 +82,9 @@ const handler = async (m, { conn, usedPrefix, command }) => {
 
   const actorIsCreator = actorRoles.includes('creador') || actorRoles.includes('owner')
 
-  // Detectar creador real
+  /* ============================
+     DETECTAR CREADOR REAL
+  ============================ */
   const creators = []
   if (Array.isArray(global.owner)) creators.push(...global.owner)
   if (global.ownerJid) creators.push(global.ownerJid)
@@ -87,25 +99,42 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     targetRoles.includes('creador') ||
     targetRoles.includes('owner')
 
-  // Intento de expulsar al creador → SHADOWBAN
+  /* ============================
+     SHADOWBAN REAL AL INTENTAR EXPULSAR AL CREADOR
+  ============================ */
   if (isTargetCreator) {
     await conn.reply(m.chat, `💀 ¿En serio intentaste expulsar al creador?`, m)
 
-    // Shadowban 15 minutos
-    const now = Date.now()
-    const expires = now + 15 * 60 * 1000
-    global.shadowbans = global.shadowbans || {}
-    global.shadowbans[actor] = { until: expires, reason: 'Intento de kick al creador' }
-
-    return conn.reply(
-      m.chat,
-      `⛔️ Has sido silenciado por 15 minutos.\nMotivo: intento de expulsar al creador.`,
-      m,
-      { mentions: [actor] }
+    // Llamar al plugin shadowban REAL
+    const shadowPlugin = Object.values(global.plugins).find(p =>
+      p.command?.includes?.('shadowban')
     )
+
+    if (shadowPlugin?.default) {
+      const fake = {
+        ...m,
+        text: `.shadowban @${actor.split('@')[0]} 15`,
+        sender: m.sender,
+        chat: m.chat,
+        isCommand: true
+      }
+
+      const extra = {
+        conn,
+        args: [actor, 15],
+        usedPrefix: '.',
+        command: 'shadowban'
+      }
+
+      await shadowPlugin.default.call(conn, fake, extra)
+    }
+
+    return
   }
 
-  // Protección moderadores (solo si actor NO es creador)
+  /* ============================
+     PROTECCIÓN DE MODERADORES
+  ============================ */
   const protectedRoles = ['mod', 'moderador', 'moderator', 'admin', 'staff']
   if (!actorIsCreator && targetRoles.some(r => protectedRoles.includes(r))) {
     return conn.reply(m.chat, `✖️ No puedes expulsar a un moderador o superior.`, m)
@@ -114,7 +143,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   /* ============================
      PODER DEL BOT
   ============================ */
-
   let botIsAdmin = false
   try {
     const meta = await conn.groupMetadata(m.chat)
@@ -124,9 +152,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
 
   const botRoles = getUserRoles(conn.user.id).map(r => r.toLowerCase())
 
-  // El bot puede expulsar si:
-  // ✅ Tiene admin
-  // ✅ O tiene rol mod/creador en el sistema SW
   const botHasPower =
     botIsAdmin ||
     botRoles.includes('mod') ||
@@ -147,7 +172,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   /* ============================
      EXPULSIÓN REAL
   ============================ */
-
   try {
     await conn.groupParticipantsUpdate(m.chat, [user], 'remove')
 
@@ -183,8 +207,11 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   }
 }
 
-handler.help = ['ban']
-handler.tags = ['mod']
+/* ============================
+   EXPORT
+============================ */
+handler.help = ['kick']
+handler.tags = ['modmenu']
 handler.command = ['kick', 'echar', 'sacar', 'ban']
 handler.group = true
 handler.botAdmin = false
