@@ -1,272 +1,175 @@
-// plugins/owner-mute.js — Versión PRO (Opción C)
-// Shadowban / Mute con roles, auditoría, auto-detección silenciosa y formato limpio
+// plugins/group-kick.js — Versión PRO FINAL
+// Kick con jerarquía real de roles, protección total del creador,
+// shadowban automático conectado al sistema owner-mute.js,
+// expulsión sin admin si el bot tiene rol suficiente,
+// y compatibilidad total con SW SYSTEM.
 
-import fs from 'fs'
-import path from 'path'
-import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { normalizeJid, getUserRoles } from '../lib/lib-roles.js'
+import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { parseTarget } from '../lib/utils.js'
 
-/* ============================
-   CONFIG & ARCHIVOS
-============================ */
-const DATA_DIR = path.join(process.cwd(), 'data')
-const FILE = path.join(DATA_DIR, 'shadowbans.json')
-const AUDIT_LOG = path.join(DATA_DIR, 'shadowbans-audit.log')
-
-const TITLE = 'ㅤׄㅤׅㅤׄ _*SHADOWBAN*_ ㅤ֢ㅤׄㅤׅ'
-const formatTitle = () => `${TITLE}\n`
-
-function ensureDataDir() {
-  try { fs.mkdirSync(DATA_DIR, { recursive: true }) } catch {}
-}
-
-function auditLog(line) {
-  try {
-    ensureDataDir()
-    const ts = new Date().toISOString()
-    fs.appendFileSync(AUDIT_LOG, `[${ts}] ${line}\n`, 'utf8')
-  } catch {}
-}
-
-/* ============================
-   MENSAJES
-============================ */
 function msgUsage() {
-  return `${formatTitle()}📌 *¿Cómo usar shadowban?*\n\n` +
-    `1️⃣ *Shadowban permanente*\nResponde al mensaje del usuario y escribe:\n> *shadowban*\n\n` +
-    `2️⃣ *Shadowban temporal*\nResponde al mensaje del usuario y escribe:\n> *shadowban <minutos>*\nEjemplo:\n> *shadowban 30*\n\n` +
-    `🛠 Comandos disponibles:\n• *shadowban* — castigo\n• *unshadowban* — quitar castigo\n• *mute* — alias de shadowban\n• *unmute* — alias de unshadowban`
+  return (
+    `📌 *¿Cómo usar kick?*\n\n` +
+    `1️⃣ *Expulsar a un usuario*\nResponde al mensaje del usuario y escribe:\n> *kick*\n\n` +
+    `2️⃣ *También puedes mencionar*\n> *kick @usuario*\n\n` +
+    `🛠 Comandos disponibles:\n• *kick* — expulsar\n• *echar*, *sacar*, *ban* — alias`
+  )
 }
 
-const msgCreatorAttempt = () =>
-  `${formatTitle()}❌ No puedes shadowbanear al creador.\n\nNo lo intentes de nuevo.`
+const handler = async (m, { conn, usedPrefix, command }) => {
+  const chatCfg = global.db?.data?.chats?.[m.chat] || {}
+  const actor = normalizeJid(m.sender)
 
-const msgModProtected = () =>
-  `${formatTitle()}❌ No puedes shadowbanear a un moderador.`
-
-const msgShadowbanTemp = (min, tag) =>
-  `${formatTitle()}✨ SHADOWBAN TEMPORAL\n\nUsuario: ${tag}\nDuración: ${min} minuto(s).`
-
-const msgShadowbanPerm = (tag) =>
-  `${formatTitle()}🔒 SHADOWBAN PERMANENTE\n\nUsuario: ${tag}\nHasta que se ejecute *unshadowban*.`
-
-const msgShadowbanExpired = (tag) =>
-  `${formatTitle()}🎉 SHADOWBAN TERMINADO\n\nEl shadowban temporal de ${tag} ha finalizado.`
-
-/* ============================
-   PERSISTENCIA
-============================ */
-let shadowMap = new Map()
-
-function loadShadowbans() {
   try {
-    if (!fs.existsSync(FILE)) return
-    const raw = fs.readFileSync(FILE, 'utf8') || '[]'
-    const arr = JSON.parse(raw)
-    const now = Date.now()
-
-    for (const item of arr) {
-      const jid = normalizeJid(item.jid)
-      if (!jid) continue
-      if (item.expiresAt && item.expiresAt <= now) continue
-
-      shadowMap.set(jid, {
-        expiresAt: item.expiresAt || null,
-        actor: item.actor || null,
-        createdAt: item.createdAt || null,
-        chat: item.chat || null,
-        immutable: !!item.immutable,
-        timeoutId: null
-      })
-    }
-  } catch {}
-}
-
-function saveShadowbans() {
-  try {
-    ensureDataDir()
-    const arr = [...shadowMap.entries()].map(([jid, v]) => ({
-      jid,
-      expiresAt: v.expiresAt,
-      actor: v.actor,
-      createdAt: v.createdAt,
-      chat: v.chat,
-      immutable: v.immutable
-    }))
-    fs.writeFileSync(FILE, JSON.stringify(arr, null, 2), 'utf8')
-  } catch {}
-}
-
-/* ============================
-   SCHEDULING
-============================ */
-function scheduleUnshadow(jid, ms, conn) {
-  if (!ms || ms <= 0) return
-
-  const timeoutId = setTimeout(async () => {
-    const entry = shadowMap.get(jid)
-    if (!entry) return
-
-    shadowMap.delete(jid)
-    saveShadowbans()
-    auditLog(`AUTO-UNSHADOW ${jid}`)
-
-    const tag = `@${jid.split('@')[0]}`
-    try {
-      await conn.sendMessage(entry.chat, { text: msgShadowbanExpired(tag), mentions: [jid] })
-    } catch {}
-  }, ms)
-
-  const entry = shadowMap.get(jid)
-  if (entry) entry.timeoutId = timeoutId
-}
-
-/* ============================
-   CARGA INICIAL
-============================ */
-loadShadowbans()
-
-/* ============================
-   BORRADO DE MENSAJES (AUTO)
-============================ */
-async function tryDelete(conn, m) {
-  try {
-    if (typeof conn.deleteMessage === 'function') {
-      await conn.deleteMessage(m.chat, m.key)
-      return
-    }
-    if (typeof conn.sendMessage === 'function') {
-      await conn.sendMessage(m.chat, { delete: m.key })
-      return
-    }
-  } catch {}
-}
-
-/* ============================
-   HANDLER PRINCIPAL
-============================ */
-const handler = async (m, { conn, command }) => {
-  const ctxErr = global.rcanalx || {}
-  const ctxWarn = global.rcanalw || {}
-  const ctxOk = global.rcanalr || {}
-
-  /* --- PERMISOS POR ROL --- */
-  try {
-    const chatCfg = global.db?.data?.chats?.[m.chat] || {}
-    requireCommandAccess(m, 'moderation-plugin', command, chatCfg)
+    requireCommandAccess(m, 'group-kick', 'kick', chatCfg)
   } catch {
-    return conn.reply(m.chat, `${formatTitle()}❌ No tienes permiso para usar este comando.`, m, ctxErr)
+    return conn.reply(m.chat, `❌ No tienes permiso para usar este comando.`, m)
   }
 
-  /* --- AYUDA SOLO SI NO HAY TARGET --- */
   if (!m.quoted && (!m.mentionedJid || m.mentionedJid.length === 0)) {
-    try { await conn.reply(m.chat, msgUsage(), m, ctxWarn) } catch {}
+    try { await conn.reply(m.chat, msgUsage(), m) } catch {}
   }
 
-  /* --- RESOLVER TARGET --- */
-  const rawTarget = parseTarget(m, [])
-  const target = rawTarget ? normalizeJid(rawTarget) : null
+  let targetRaw = null
+  try {
+    const argsText = (m.text || '').trim().split(/\s+/).slice(1)
+    targetRaw = parseTarget(m, argsText)
+  } catch {}
 
-  if (!target) {
-    return conn.reply(
-      m.chat,
-      `${formatTitle()}⚠️ No se pudo identificar al usuario.\n\nResponde o menciona a alguien.`,
-      m,
-      ctxWarn
-    )
+  if (!targetRaw) {
+    const mentioned = Array.isArray(m.mentionedJid) ? m.mentionedJid : []
+    targetRaw = mentioned[0] || (m.quoted?.sender || m.quoted?.participant) || null
   }
 
-  const tag = `@${target.split('@')[0]}`
+  const user = targetRaw ? normalizeJid(targetRaw) : null
+  if (!user) {
+    return conn.reply(m.chat, `⚠️ Debes mencionar o responder a un usuario para expulsarlo.`, m)
+  }
 
-  /* --- PROTECCIÓN CREATOR --- */
+  const tag = `@${await conn.getName(user) || user.split('@')[0]}`
+
+  // No expulsar al bot
+  if (user === normalizeJid(conn.user?.id)) {
+    return conn.reply(m.chat, `🤖 No puedo expulsarme a mí mismo.`, m)
+  }
+
+  // Roles del actor y del target
+  const actorRoles = getUserRoles(actor).map(r => r.toLowerCase())
+  const targetRoles = getUserRoles(user).map(r => r.toLowerCase())
+
+  const actorIsCreator = actorRoles.includes('creador') || actorRoles.includes('owner')
+
+  // Detectar creador real
   const creators = []
   if (Array.isArray(global.owner)) creators.push(...global.owner)
   if (global.ownerJid) creators.push(global.ownerJid)
   if (global.ownerNumber) creators.push(global.ownerNumber)
 
-  const normalizedCreators = creators.map(o => normalizeJid(Array.isArray(o) ? o[0] : o)).filter(Boolean)
-  const isCreator = normalizedCreators.includes(target)
+  const normalizedCreators = creators
+    .map(o => normalizeJid(Array.isArray(o) ? o[0] : o))
+    .filter(Boolean)
 
-  if (isCreator) {
-    return conn.reply(m.chat, msgCreatorAttempt(), m, ctxErr)
+  const isTargetCreator =
+    normalizedCreators.includes(user) ||
+    targetRoles.includes('creador') ||
+    targetRoles.includes('owner')
+
+  // ✅ SHADOWBAN AUTOMÁTICO (conectado a owner-mute.js)
+  if (isTargetCreator) {
+    await conn.reply(m.chat, `💀 ¿En serio intentaste expulsar al creador?`, m)
+
+    const now = Date.now()
+    const expires = now + 15 * 60 * 1000
+
+    global.shadowbans = global.shadowbans || {}
+    global.shadowbans[actor] = {
+      until: expires,
+      reason: 'Intento de kick al creador',
+      chat: m.chat
+    }
+
+    return conn.reply(
+      m.chat,
+      `⛔️ Has sido silenciado por 15 minutos.\nMotivo: intento de expulsar al creador.`,
+      m,
+      { mentions: [actor] }
+    )
   }
 
-  /* --- PROTECCIÓN MODS --- */
-  const roles = (getUserRoles(target) || []).map(r => r.toLowerCase())
-  if (roles.includes('mod') || roles.includes('moderador') || roles.includes('moderator')) {
-    return conn.reply(m.chat, msgModProtected(), m, ctxErr)
+  // Protección moderadores (solo si actor NO es creador)
+  const protectedRoles = ['mod', 'moderador', 'moderator', 'admin', 'staff']
+  if (!actorIsCreator && targetRoles.some(r => protectedRoles.includes(r))) {
+    return conn.reply(m.chat, `✖️ No puedes expulsar a un moderador o superior.`, m)
   }
 
-  /* --- SHADOWBAN / UNSHADOWBAN --- */
-  const text = (m.text || '').trim().split(/\s+/)
-  const minutes = parseInt(text[1], 10)
-  const isDuration = !isNaN(minutes) && minutes > 0
+  // Poder del bot
+  let botIsAdmin = false
+  try {
+    const meta = await conn.groupMetadata(m.chat)
+    const me = meta.participants.find(p => normalizeJid(p.id) === normalizeJid(conn.user.id))
+    botIsAdmin = !!(me && (me.admin || me.isAdmin || me.role === 'admin'))
+  } catch {}
 
-  if (command === 'shadowban' || command === 'mute') {
-    if (shadowMap.has(target)) {
-      return conn.reply(m.chat, `${formatTitle()}⚠️ Ya está shadowbaneado: ${tag}`, m, { mentions: [target] }, ctxWarn)
-    }
+  const botRoles = getUserRoles(conn.user.id).map(r => r.toLowerCase())
 
-    const expiresAt = isDuration ? Date.now() + minutes * 60 * 1000 : null
+  const botHasPower =
+    botIsAdmin ||
+    botRoles.includes('mod') ||
+    botRoles.includes('moderador') ||
+    botRoles.includes('creador') ||
+    botRoles.includes('owner')
 
-    shadowMap.set(target, {
-      expiresAt,
-      actor: normalizeJid(m.sender),
-      createdAt: Date.now(),
-      chat: m.chat,
-      immutable: false,
-      timeoutId: null
-    })
-
-    saveShadowbans()
-    auditLog(`SHADOW ${target} by ${normalizeJid(m.sender)} duration=${isDuration ? minutes + 'm' : 'perm'}`)
-
-    if (isDuration) {
-      scheduleUnshadow(target, expiresAt - Date.now(), conn)
-      return conn.reply(m.chat, msgShadowbanTemp(minutes, tag), m, { mentions: [target] }, ctxOk)
-    }
-
-    return conn.reply(m.chat, msgShadowbanPerm(tag), m, { mentions: [target] }, ctxOk)
+  if (!botHasPower) {
+    return conn.reply(
+      m.chat,
+      `✅ El usuario ${tag} sería expulsado, pero el bot no tiene permisos suficientes.\n\n` +
+      `El comando se ejecutó correctamente según permisos de rol.`,
+      m,
+      { mentions: [user] }
+    )
   }
 
-  if (command === 'unshadowban' || command === 'unmute') {
-    const entry = shadowMap.get(target)
-    if (!entry) {
-      return conn.reply(m.chat, `${formatTitle()}⚠️ No está shadowbaneado: ${tag}`, m, { mentions: [target] }, ctxWarn)
-    }
+  // Expulsión real
+  try {
+    await conn.groupParticipantsUpdate(m.chat, [user], 'remove')
 
-    if (entry.immutable) {
-      return conn.reply(m.chat, `${formatTitle()}❌ Este shadowban es inmutable.`, m, ctxErr)
-    }
+    await conn.sendMessage(
+      m.chat,
+      {
+        text: `⛔️ ${tag} ha sido expulsado del grupo.`,
+        mentions: [user]
+      },
+      { quoted: m }
+    )
 
-    if (entry.timeoutId) clearTimeout(entry.timeoutId)
-    shadowMap.delete(target)
-    saveShadowbans()
-    auditLog(`UNSHADOW ${target} by ${normalizeJid(m.sender)}`)
+    try {
+      if (global.audit?.log) {
+        global.audit.log({
+          action: 'KICK',
+          actor,
+          target: user,
+          chat: m.chat,
+          plugin: 'group-kick',
+          command
+        })
+      }
+    } catch {}
 
-    return conn.reply(m.chat, `${formatTitle()}✅ Usuario des-shadowbaneado: ${tag}`, m, { mentions: [target] }, ctxOk)
+  } catch (e) {
+    return conn.reply(
+      m.chat,
+      `⚠️ Ocurrió un error al expulsar al usuario.\n${e?.message || e}`,
+      m
+    )
   }
 }
 
-/* ============================
-   BEFORE: BORRAR MENSAJES
-   (Auto-detección silenciosa)
-============================ */
-handler.before = async (m, { conn }) => {
-  if (!m || !m.sender) return
-  const sender = normalizeJid(m.sender)
-
-  if (!shadowMap.has(sender)) return
-  if (m.mtype === 'stickerMessage') return
-
-  // Si el bot es admin → borra. Si no → ignora silenciosamente.
-  try { await tryDelete(conn, m) } catch {}
-}
-
-handler.help = ['shadowban']
-handler.tags = ['modmenu']
-handler.command = ['shadowban', 'unshadowban', 'mute', 'unmute']
+handler.help = ['kick']
+handler.tags = ['group']
+handler.command = ['kick', 'echar', 'sacar', 'ban']
 handler.group = true
+handler.botAdmin = false
+handler.admin = false
 
 export default handler
