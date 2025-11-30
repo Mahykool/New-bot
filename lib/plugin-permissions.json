@@ -52,6 +52,7 @@
     "shadowban": "manage",
     "unshadowban": "manage"
   },
+    
   "__defaults__": {
     "command": "manage"
   }
