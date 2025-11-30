@@ -365,7 +365,7 @@ let handler = async (m, { conn, usedPrefix, command, args }) => {
 }
 
 handler.help = ['enable','disable']
-handler.tags = ['nable','owner']
+handler.tags = ['creador']
 handler.command = ['enable','disable','on','off','true','false','1','0']
 
 export default handler
