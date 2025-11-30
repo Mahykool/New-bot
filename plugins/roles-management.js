@@ -1,6 +1,7 @@
 // plugins/roles-management.js
 // SW SYSTEM — Roles Manager (versión final optimizada)
 // Parche: usar parseTarget centralizado para normalizar menciones/respuestas/números
+// Actualizado: manejo de permisos con try/catch, uso de chatCfg y actor para auditoría
 
 import {
   getRolesConfig,
@@ -46,6 +47,10 @@ const handler = async (m, { conn, command, args, usedPrefix }) => {
 
   const rolesConfig = getRolesConfig()
   const validLevels = ['none', 'basic', 'manage', 'full']
+
+  // contexto útil para permisos y auditoría
+  const chatCfg = global.db?.data?.chats?.[m.chat] || global.chatDefaults || {}
+  const actor = normalizeJid(m.sender)
 
   // ------------------------------
   // MENÚ PRINCIPAL — .rolmenu
@@ -114,7 +119,8 @@ ${available}
 
   // WHOIS
   if (cmd === 'whois') {
-    const target = parseTarget(m, args)
+    const targetRaw = parseTarget(m, args)
+    const target = normalizeJid(targetRaw)
     if (!target)
       return conn.reply(m.chat, format('Debes mencionar o responder a un usuario.'), m, ctxWarn)
 
@@ -170,7 +176,7 @@ ${plugins}
     let text = `👥 *ROLES DEL GRUPO*\n\n`
 
     for (const p of participants) {
-      const jid = normalizeJid(p.id)
+      const jid = normalizeJid(p.id || p)
       const roles = getUserRoles(jid).join(', ') || 'user'
       text += `@${jid.split('@')[0]} — ${roles}\n`
     }
@@ -182,7 +188,11 @@ ${plugins}
 
   // LISTA DE ROLES — .roles
   if (cmd === 'roles') {
-    requireCommandAccess(m.sender, 'roles-management', 'roles')
+    try {
+      requireCommandAccess(m, 'roles-management', 'roles', chatCfg)
+    } catch (err) {
+      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+    }
 
     const all = listRoles()
     const text = `
@@ -200,15 +210,20 @@ ${all.map(r => `- ${r}`).join('\n')}
 
   // SETROLE
   if (cmd === 'setrole') {
-    requireCommandAccess(m.sender, 'roles-management', 'setrole')
+    try {
+      requireCommandAccess(m, 'roles-management', 'setrole', chatCfg)
+    } catch (err) {
+      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+    }
 
-    const target = parseTarget(m, args)
+    const targetRaw = parseTarget(m, args)
+    const target = normalizeJid(targetRaw)
     const roleId = extractRoleArg(args)
 
     if (!target || !roleExists(roleId))
       return conn.reply(m.chat, format('Uso: .setrole @usuario <rol>'), m, ctxWarn)
 
-    const updated = setUserRole(target, roleId)
+    const updated = setUserRole(target, roleId, actor)
     try { global.userRoles = getUserRolesMap() } catch {}
 
     return conn.reply(
@@ -221,15 +236,20 @@ ${all.map(r => `- ${r}`).join('\n')}
 
   // ADDROLE
   if (cmd === 'addrole') {
-    requireCommandAccess(m.sender, 'roles-management', 'addrole')
+    try {
+      requireCommandAccess(m, 'roles-management', 'addrole', chatCfg)
+    } catch (err) {
+      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+    }
 
-    const target = parseTarget(m, args)
+    const targetRaw = parseTarget(m, args)
+    const target = normalizeJid(targetRaw)
     const roleId = extractRoleArg(args)
 
     if (!target || !roleExists(roleId))
       return conn.reply(m.chat, format('Uso: .addrole @usuario <rol>'), m, ctxWarn)
 
-    const updated = addUserRole(target, roleId)
+    const updated = addUserRole(target, roleId, actor)
     try { global.userRoles = getUserRolesMap() } catch {}
 
     return conn.reply(
@@ -242,15 +262,20 @@ ${all.map(r => `- ${r}`).join('\n')}
 
   // REMOVEROLE
   if (cmd === 'removerole') {
-    requireCommandAccess(m.sender, 'roles-management', 'removerole')
+    try {
+      requireCommandAccess(m, 'roles-management', 'removerole', chatCfg)
+    } catch (err) {
+      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+    }
 
-    const target = parseTarget(m, args)
+    const targetRaw = parseTarget(m, args)
+    const target = normalizeJid(targetRaw)
     const roleId = extractRoleArg(args)
 
     if (!target || !roleExists(roleId))
       return conn.reply(m.chat, format('Uso: .removerole @usuario <rol>'), m, ctxWarn)
 
-    const updated = removeUserRole(target, roleId)
+    const updated = removeUserRole(target, roleId, actor)
     try { global.userRoles = getUserRolesMap() } catch {}
 
     return conn.reply(
@@ -263,7 +288,11 @@ ${all.map(r => `- ${r}`).join('\n')}
 
   // SETPLUGINROLE
   if (cmd === 'setpluginrole') {
-    requireCommandAccess(m.sender, 'roles-management', 'setpluginrole')
+    try {
+      requireCommandAccess(m, 'roles-management', 'setpluginrole', chatCfg)
+    } catch (err) {
+      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+    }
 
     const roleId = normalizeRoleId(args[0] || '')
     const pluginId = (args[1] || '').toLowerCase()
@@ -296,7 +325,11 @@ ${all.map(r => `- ${r}`).join('\n')}
 
   // role reload (soporta variantes: "role reload", "role-reload")
   if (cmd === 'role-reload') {
-    requireCommandAccess(m.sender, 'roles-management', 'role-reload')
+    try {
+      requireCommandAccess(m, 'roles-management', 'role-reload', chatCfg)
+    } catch (err) {
+      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+    }
 
     reloadRoles?.()
     try { global.userRoles = getUserRolesMap() } catch {}
@@ -306,9 +339,14 @@ ${all.map(r => `- ${r}`).join('\n')}
 
   // role list (soporta variantes: "role list", "role-list", "rolelist")
   if (cmd === 'role-list' || cmd === 'rolelist') {
-    requireCommandAccess(m.sender, 'roles-management', 'role-list')
+    try {
+      requireCommandAccess(m, 'roles-management', 'role-list', chatCfg)
+    } catch (err) {
+      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+    }
 
-    const target = parseTarget(m, args)
+    const targetRaw = parseTarget(m, args)
+    const target = normalizeJid(targetRaw)
     if (!target)
       return conn.reply(m.chat, format('Uso: .rolelist @usuario'), m, ctxWarn)
 
@@ -328,7 +366,11 @@ Principal: ${info.name || info.id}
   if (cmd === 'role') {
     // role reload
     if (args[0] === 'reload') {
-      requireCommandAccess(m.sender, 'roles-management', 'role-reload')
+      try {
+        requireCommandAccess(m, 'roles-management', 'role-reload', chatCfg)
+      } catch (err) {
+        return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+      }
 
       reloadRoles?.()
       try { global.userRoles = getUserRolesMap() } catch {}
@@ -338,9 +380,14 @@ Principal: ${info.name || info.id}
 
     // role list
     if (args[0] === 'list') {
-      requireCommandAccess(m.sender, 'roles-management', 'role-list')
+      try {
+        requireCommandAccess(m, 'roles-management', 'role-list', chatCfg)
+      } catch (err) {
+        return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
+      }
 
-      const target = parseTarget(m, args.slice(1))
+      const targetRaw = parseTarget(m, args.slice(1))
+      const target = normalizeJid(targetRaw)
       if (!target)
         return conn.reply(m.chat, format('Uso: .role list @usuario'), m, ctxWarn)
 
