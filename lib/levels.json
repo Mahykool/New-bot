@@ -1,7 +1,7 @@
 {
   "basic": 1,
-  "vip": 2,
-  "vip_plus": 3,
-  "manage": 4,
-  "full": 5
+  "vip": 100,
+  "vip_plus": 200,
+  "manage": 5000,
+  "full": 9999
 }
