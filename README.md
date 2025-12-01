@@ -94,3 +94,29 @@ rm -rf Swill-bot && git clone https://github.com/Mahykool/Prueba-swill.git && cd
 ```
 
 </details>
+
+
+<details>
+<summary><b> COMAND ub </b></summary>
+
+```bash
+sudo apt update && sudo apt upgrade -y && \
+sudo apt install -y git curl build-essential ffmpeg imagemagick libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev && \
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - && \
+sudo apt install -y nodejs && \
+sudo npm install -g yarn
+```
+
+```bash
+rm -rf Swill-bot && git clone https://github.com/Mahykool/Prueba-swill.git && cd Prueba-swill && npm install && npm start
+```
+```bash
+git clone https://github.com/Mahykool/New-bot.git && cd New-bot
+```
+```bash
+npm install
+```
+```bash
+npm start
+```
+</details>
