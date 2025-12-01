@@ -1,0 +1,14 @@
+{
+  "__defaults__": {
+    "command": "manage"
+  },
+  "roles-management": {
+    "rolmenu": "basic",
+    "whois": "basic",
+    "roleinfo": "basic",
+    "grouproles": "basic",
+    "setrole": "full",
+    "addrole": "full",
+    "removerole": "full"
+  }
+}
