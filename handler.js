@@ -74,75 +74,39 @@ function isPremiumJid(jid) {
   return !!u?.premium
 }
 
-// Función parseUserTargets - AGREGADA
+/**
+ * ✅ parseUserTargets — versión segura y minimalista
+ * - NO usa `m` implícito
+ * - NO intenta adivinar números desde texto libre del mensaje
+ * - SOLO normaliza:
+ *   - arrays de JIDs/IDs
+ *   - strings con lista de JIDs/IDs separados por coma/espacio/salto de línea
+ * - Pensado para futuros plugins que ya tengan los JIDs identificados
+ */
 function parseUserTargets(input, options = {}) {
-    try {
-        if (!input || input.trim() === '') return [];
+  try {
+    if (!input) return []
 
-        const defaults = {
-            allowLids: true,
-            resolveMentions: true,
-            groupJid: null,
-            maxTargets: 50
-        };
-        const opts = { ...defaults, ...options };
-
-        if (Array.isArray(input)) {
-            return input.map(jid => normalizeJid(jid)).filter(jid => jid);
-        }
-
-        if (typeof input === 'string') {
-            let targets = [];
-
-            if (opts.resolveMentions && typeof m !== 'undefined' && m && m._mentionedJidResolved && m._mentionedJidResolved.length > 0) {
-                targets.push(...m._mentionedJidResolved.map(jid => normalizeJid(jid)));
-            }
-
-            const textTargets = input.split(/[,;\s\n]+/).map(item => item.trim()).filter(item => item);
-
-            for (let item of textTargets) {
-                if (item.startsWith('@')) {
-                    const num = item.substring(1);
-                    if (num) {
-                        const jid = `${num}@s.whatsapp.net`;
-                        targets.push(jid);
-                    }
-                    continue;
-                }
-
-                if (/^[\d+][\d\s\-()]+$/.test(item)) {
-                    const cleanNum = item.replace(/[^\d+]/g, '');
-                    if (cleanNum.length >= 8) {
-                        const jid = `${cleanNum.replace(/^\+/, '')}@s.whatsapp.net`;
-                        targets.push(jid);
-                    }
-                    continue;
-                }
-
-                if (item.includes('@')) {
-                    targets.push(normalizeJid(item));
-                    continue;
-                }
-
-                if (/^\d+$/.test(item) && item.length >= 8) {
-                    targets.push(`${item}@s.whatsapp.net`);
-                }
-            }
-
-            targets = [...new Set(targets.map(jid => normalizeJid(jid)).filter(jid => jid))];
-
-            if (opts.maxTargets && targets.length > opts.maxTargets) {
-                targets = targets.slice(0, opts.maxTargets);
-            }
-
-            return targets;
-        }
-
-        return [];
-    } catch (error) {
-        console.error('Error en parseUserTargets:', error);
-        return [];
+    // Si ya es un array (de jids, ids, números), solo normalizar
+    if (Array.isArray(input)) {
+      return [...new Set(input.map(j => normalizeJid(j)).filter(Boolean))]
     }
+
+    if (typeof input === 'string') {
+      // Lista simple separada por coma, espacio, salto de línea, etc.
+      const parts = input
+        .split(/[,;\s\n]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+
+      return [...new Set(parts.map(j => normalizeJid(j)).filter(Boolean))]
+    }
+
+    return []
+  } catch (error) {
+    console.error('Error en parseUserTargets:', error)
+    return []
+  }
 }
 
 // SISTEMA DE PRIMARY BOT - AGREGADO
