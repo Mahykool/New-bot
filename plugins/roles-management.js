@@ -1,427 +1,48 @@
 // plugins/roles-management.js
-// SW SYSTEM — Roles Manager (Versión PRO con confirmación interactiva)
-// - Control 100% por roles (requireCommandAccess)
-// - Targets resueltos con parseTarget + fallback robusto
-// - Menciones reales en las respuestas clave
-// - Confirmación con botones: ✅ Confirmar / ❌ Denegar
-
 import {
-  getRolesConfig,
-  saveRolesConfig,
   getUserRoles,
-  getUserRolesMap,
-  setUserRole,
+  getRoleInfo,
   addUserRole,
   removeUserRole,
-  getRoleInfo,
-  normalizeRoleId,
-  normalizeJid,
-  reloadRoles,
-  roleExists,
-  listRoles
+  setUserRole,
+  normalizeJid
 } from '../lib/lib-roles.js'
 
-import { requireCommandAccess } from '../lib/permissions-middleware.js'
-import { parseTarget } from '../lib/utils.js'
+const handler = async (m, { conn, args, command }) => {
+  const target = m.mentionedJid?.[0]
+  if (!target) return m.reply('Debes mencionar a un usuario.')
 
-// ------------------------------
-// Helpers
-// ------------------------------
-function extractRoleArg(args = []) {
-  for (const a of args) {
-    if (!a || a.startsWith('@') || /^@\d+/.test(a)) continue
-    return normalizeRoleId(a)
-  }
-  return normalizeRoleId(args[args.length - 1] || '')
-}
+  const role = args[1]
+  if (!role) return m.reply('Debes indicar un rol.')
 
-function resolveTarget(m, args = []) {
-  let raw = null
-  try { raw = parseTarget(m, args) } catch {}
-
-  if (!raw && m.mentionedJid?.length) raw = m.mentionedJid[0]
-  if (!raw && m.quoted) raw = m.quoted.sender || m.quoted.participant
-
-  return raw ? normalizeJid(raw) : null
-}
-
-const format = txt => `*ROLES* — ${txt}`
-
-// ------------------------------
-// Confirmación interactiva
-// ------------------------------
-async function confirmAction(conn, m, text, confirmId, denyId, mentions = []) {
-  return conn.sendMessage(
-    m.chat,
-    {
-      text,
-      footer: 'SW SYSTEM — Confirmación requerida',
-      templateButtons: [
-        { index: 1, quickReplyButton: { displayText: '✅ Confirmar', id: confirmId } },
-        { index: 2, quickReplyButton: { displayText: '❌ Denegar', id: denyId } }
-      ],
-      mentions
-    },
-    { quoted: m }
-  )
-}
-
-// ------------------------------
-// Handler principal
-// ------------------------------
-const handler = async (m, { conn, command, args, usedPrefix }) => {
-  const cmd = (command || '').toLowerCase()
-  const ctxErr = global.rcanalx || {}
-  const ctxWarn = global.rcanalw || {}
-  const ctxOk = global.rcanalr || {}
-
-  const rolesConfig = getRolesConfig()
-  const validLevels = ['none', 'basic', 'manage', 'full']
-  const chatCfg = global.db?.data?.chats?.[m.chat] || {}
-  const actor = normalizeJid(m.sender)
-
-  // ------------------------------
-  // MENÚ PRINCIPAL — .rolmenu
-  // ------------------------------
-  if (cmd === 'rolmenu') {
-    const info = getRoleInfo(m.sender)
-    const userRoles = getUserRoles(m.sender)
-    const userRolesStr = userRoles.length ? userRoles.join(', ') : 'none'
-
-    const available = Object.keys(rolesConfig)
-      .map(r => `${r} — ${rolesConfig[r].name}`)
-      .join('\n')
-
-    const text = `
-🐙 *MENÚ DE ROLES — SW SYSTEM*
-
-👤 *Tu rol principal:* ${info.icon} ${info.name}
-🔹 *Roles asignados:* ${userRolesStr}
-
-━━━━━━━━━━━━━━━━━━
-📌 *COMANDOS PARA USUARIOS*
-${usedPrefix}rolmenu
-${usedPrefix}whois @usuario
-${usedPrefix}roleinfo <rol>
-${usedPrefix}grouproles
-${usedPrefix}roles
-
-━━━━━━━━━━━━━━━━━━
-🛡️ *COMANDOS DE MODERACIÓN*
-${usedPrefix}setrole @usuario <rol>
-${usedPrefix}addrole @usuario <rol>
-${usedPrefix}removerole @usuario <rol>
-${usedPrefix}setpluginrole <rol> <pluginId> <nivel>
-${usedPrefix}rolelist @usuario
-${usedPrefix}role reload
-
-━━━━━━━━━━━━━━━━━━
-📚 *Roles disponibles:*
-${available}
-`.trim()
-
-    return conn.reply(m.chat, text, m, ctxOk)
+  if (command === 'addrole') {
+    addUserRole(target, role, m.sender)
+    return m.reply(`✅ Rol añadido: ${role}`, null, { mentions: [target] })
   }
 
-  // WHOIS — público (CORREGIDO CON NOMBRE REAL)
-  if (cmd === 'whois') {
-    const target = resolveTarget(m, args)
-    if (!target)
-      return conn.reply(m.chat, format('Debes mencionar o responder a un usuario.'), m, ctxWarn)
+  if (command === 'removerole') {
+    removeUserRole(target, role, m.sender)
+    return m.reply(`✅ Rol removido: ${role}`, null, { mentions: [target] })
+  }
 
-    const info = getRoleInfo(target)
+  if (command === 'setrole') {
+    setUserRole(target, role, m.sender)
+    return m.reply(`✅ Rol establecido: ${role}`, null, { mentions: [target] })
+  }
+
+  if (command === 'roles') {
     const roles = getUserRoles(target)
-    const rolesStr = roles.length ? roles.join(', ') : 'none'
-    const name = await conn.getName(target)
-    const tag = `@${name || target.split('@')[0]}`
-
-    const text = `
-👤 Usuario: ${tag}
-👑 Rol principal: ${info.icon} ${info.name}
-🔹 Roles asignados: ${rolesStr}
-`.trim()
-
-    return conn.reply(m.chat, format(text), m, { ...ctxOk, mentions: [target] })
+    return m.reply(`Roles: ${roles.join(', ')}`, null, { mentions: [target] })
   }
 
-  // ROLEINFO — público
-  if (cmd === 'roleinfo') {
-    const roleId = extractRoleArg(args)
-    if (!roleExists(roleId))
-      return conn.reply(m.chat, format('Rol inválido. Usa .rolmenu para ver la lista.'), m, ctxWarn)
-
-    const role = rolesConfig[roleId]
-    const perms = role.globalPermissions || []
-    const permsStr = perms.length ? perms.join(', ') : 'none'
-
-    const plugins = Object.entries(role.pluginPermissions || {})
-      .map(([p, lvl]) => `- ${p}: ${lvl}`)
-      .join('\n') || 'none'
-
-    const text = `
-ID: ${roleId}
-Nombre: ${role.name}
-Icono: ${role.icon}
-Nivel de rol: ${role.roleLevel || 'basic'}
-Descripción: ${role.description}
-
-Permisos globales:
-${permsStr !== 'none' ? `- ${permsStr}` : 'none'}
-
-Permisos por plugin:
-${plugins}
-`.trim()
-
-    return conn.reply(m.chat, format(text), m, ctxOk)
-  }
-
-  // GROUPOLES — público (CORREGIDO CON NOMBRES REALES)
-  if (cmd === 'grouproles') {
-    if (!m.isGroup)
-      return conn.reply(m.chat, format('Este comando solo funciona en grupos.'), m, ctxWarn)
-
-    const group = await conn.groupMetadata(m.chat)
-    const participants = group.participants || []
-
-    let text = `👥 *ROLES DEL GRUPO*\n\n`
-    const mentions = []
-
-    for (const p of participants) {
-      const jid = normalizeJid(p.id || p)
-      const roles = getUserRoles(jid)
-      const rolesStr = roles.length ? roles.join(', ') : 'user'
-      const name = await conn.getName(jid)
-      const tag = `@${name || jid.split('@')[0]}`
-      text += `${tag} — ${rolesStr}\n`
-      mentions.push(jid)
-    }
-
-    return conn.reply(m.chat, text.trim(), m, { mentions, ...ctxOk })
-  }
-
-  // ROLES — protegido
-  if (cmd === 'roles') {
-    try {
-      requireCommandAccess(m, 'roles-management', 'roles', chatCfg)
-    } catch {
-      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
-    }
-
-    const all = listRoles()
-    const text = `
-📚 *ROLES DISPONIBLES EN EL SISTEMA*
-
-${all.map(r => `- ${r}`).join('\n')}
-`.trim()
-
-    return conn.reply(m.chat, format(text), m, ctxOk)
-  }
-
-  // ------------------------------
-  // COMANDOS DE MODERACIÓN
-  // ------------------------------
-
-  // SETROLE — con confirmación
-  if (cmd === 'setrole') {
-    try {
-      requireCommandAccess(m, 'roles-management', 'setrole', chatCfg)
-    } catch {
-      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
-    }
-
-    const target = resolveTarget(m, args)
-    const roleId = extractRoleArg(args)
-
-    if (!target || !roleExists(roleId)) {
-      return conn.reply(m.chat, format('Uso: .setrole @usuario <rol>'), m, ctxWarn)
-    }
-
-    const name = await conn.getName(target)
-    const tag = `@${name || target.split('@')[0]}`
-    const confirmId = `confirm:setrole:${target}:${roleId}`
-    const denyId = `deny:setrole:${target}:${roleId}`
-
-    return confirmAction(
-      conn,
-      m,
-      `¿Confirmas asignar el rol *${roleId}* como principal a ${tag}?`,
-      confirmId,
-      denyId,
-      [target]
-    )
-  }
-
-  // ADDROLE — con confirmación
-  if (cmd === 'addrole') {
-    try {
-      requireCommandAccess(m, 'roles-management', 'addrole', chatCfg)
-    } catch {
-      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
-    }
-
-    const target = resolveTarget(m, args)
-    const roleId = extractRoleArg(args)
-
-    if (!target || !roleExists(roleId)) {
-      return conn.reply(m.chat, format('Uso: .addrole @usuario <rol>'), m, ctxWarn)
-    }
-
-    const name = await conn.getName(target)
-    const tag = `@${name || target.split('@')[0]}`
-    const confirmId = `confirm:addrole:${target}:${roleId}`
-    const denyId = `deny:addrole:${target}:${roleId}`
-
-    return confirmAction(
-      conn,
-      m,
-      `¿Confirmas agregar el rol *${roleId}* a ${tag}?`,
-      confirmId,
-      denyId,
-      [target]
-    )
-  }
-
-  // REMOVEROLE — con confirmación
-  if (cmd === 'removerole') {
-    try {
-      requireCommandAccess(m, 'roles-management', 'removerole', chatCfg)
-    } catch {
-      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
-    }
-
-    const target = resolveTarget(m, args)
-    const roleId = extractRoleArg(args)
-
-    if (!target || !roleExists(roleId)) {
-      return conn.reply(m.chat, format('Uso: .removerole @usuario <rol>'), m, ctxWarn)
-    }
-
-    const name = await conn.getName(target)
-    const tag = `@${name || target.split('@')[0]}`
-    const confirmId = `confirm:removerole:${target}:${roleId}`
-    const denyId = `deny:removerole:${target}:${roleId}`
-
-    return confirmAction(
-      conn,
-      m,
-      `¿Confirmas remover el rol *${roleId}* de ${tag}?`,
-      confirmId,
-      denyId,
-      [target]
-    )
-  }
-
-  // ------------------------------
-  // IMPORTANTE:
-  // YA NO HAY EJECUCIÓN DE BOTONES AQUÍ.
-  // ESO AHORA LO MANEJA _roles-confirm.js
-  // ------------------------------
-
-  // SETPLUGINROLE — sin confirmación
-  if (cmd === 'setpluginrole') {
-    try {
-      requireCommandAccess(m, 'roles-management', 'setpluginrole', chatCfg)
-    } catch {
-      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
-    }
-
-    const roleId = normalizeRoleId(args[0] || '')
-    const pluginId = (args[1] || '').toLowerCase()
-    const level = (args[2] || '').toLowerCase()
-
-    if (!roleExists(roleId)) {
-      return conn.reply(m.chat, format('Rol inválido.'), m, ctxWarn)
-    }
-    if (!pluginId) {
-      return conn.reply(m.chat, format('Debes indicar pluginId.'), m, ctxWarn)
-    }
-    if (!validLevels.includes(level)) {
-      return conn.reply(m.chat, format('Nivel inválido.'), m, ctxWarn)
-    }
-
-    rolesConfig[roleId].pluginPermissions =
-      rolesConfig[roleId].pluginPermissions || {}
-
-    rolesConfig[roleId].pluginPermissions[pluginId] = level
-
-    saveRolesConfig(rolesConfig)
-    reloadRoles?.()
-
-    return conn.reply(
-      m.chat,
-      format(`Nivel actualizado.\nRol: ${roleId}\nPlugin: ${pluginId}\nNivel: ${level}`),
-      m,
-      ctxOk
-    )
-  }
-
-  // ROLE-RELOAD
-  if (cmd === 'role-reload') {
-    try {
-      requireCommandAccess(m, 'roles-management', 'role-reload', chatCfg)
-    } catch {
-      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
-    }
-
-    reloadRoles?.()
-    try { global.userRoles = getUserRolesMap() } catch {}
-
-    return conn.reply(m.chat, format('Roles recargados desde disco.'), m, ctxOk)
-  }
-
-  // ROLELIST — corregido con nombre real
-  if (cmd === 'role-list' || cmd === 'rolelist') {
-    try {
-      requireCommandAccess(m, 'roles-management', 'role-list', chatCfg)
-    } catch {
-      return conn.reply(m.chat, format('No tienes permisos para usar este comando.'), m, ctxWarn)
-    }
-
-    const target = resolveTarget(m, args)
-    if (!target) {
-      return conn.reply(m.chat, format('Uso: .rolelist @usuario'), m, ctxWarn)
-    }
-
-    const roles = getUserRoles(target)
-    const info = getRoleInfo(target)
-    const rolesStr = roles.length ? roles.join(', ') : 'none'
-    const name = await conn.getName(target)
-    const tag = `@${name || target.split('@')[0]}`
-
-    const text = `
-Usuario: ${tag}
-Roles: ${rolesStr}
-Principal: ${info.name || info.id}
-`.trim()
-
-    return conn.reply(
-      m.chat,
-      format(text),
-      m,
-      { mentions: [target], ...ctxOk }
-    )
+  if (command === 'roleinfo') {
+    const info = getRoleInfo(role)
+    return m.reply(`Rol: ${info.name}\nNivel: ${info.roleLevel}`)
   }
 }
 
-// ------------------------------
-// Registro de comandos
-// ------------------------------
-handler.help = ['rolmenu']
+handler.command = ['addrole', 'removerole', 'setrole', 'roles', 'roleinfo']
 handler.tags = ['roles']
-handler.command = [
-  'rolmenu',
-  'whois',
-  'roleinfo',
-  'grouproles',
-  'roles',
-  'setrole',
-  'addrole',
-  'removerole',
-  'setpluginrole',
-  'role',
-  'role-reload',
-  'role-list',
-  'rolelist'
-]
+handler.group = true
 
 export default handler
