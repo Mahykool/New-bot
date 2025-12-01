@@ -108,7 +108,7 @@ sudo npm install -g yarn
 ```
 
 ```bash
-rm -rf Swill-bot && git clone https://github.com/Mahykool/Prueba-swill.git && cd Prueba-swill && npm install && npm start
+git clone https://github.com/Mahykool/New-bot.git && cd New-bot && npm install && npm start
 ```
 ```bash
 git clone https://github.com/Mahykool/New-bot.git && cd New-bot
