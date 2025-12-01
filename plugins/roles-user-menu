@@ -1,0 +1,28 @@
+// plugins/roles-user-menu.js
+import { getUserRoles, getUserLevel, listRoles } from '../lib/lib-roles.js'
+
+const handler = async (m, { conn }) => {
+    const jid = m.sender
+    const roles = getUserRoles(jid)
+    const level = getUserLevel(jid)
+    const allRoles = listRoles()
+
+    let txt = `🎭 *MENÚ DE ROLES*\n\n`
+
+    txt += `👤 *Tus roles:* ${roles.length ? roles.join(', ') : 'Ninguno'}\n`
+    txt += `📊 *Tu nivel:* ${level}\n\n`
+
+    txt += `📌 *Roles disponibles:*\n\n`
+    for (const r of allRoles) {
+        txt += `${r.icon || ''} *${r.role}*\n`
+        txt += `• Nivel: ${r.level}\n`
+        txt += `• ${r.description}\n\n`
+    }
+
+    return m.reply(txt)
+}
+
+handler.command = ['rolesmenu', 'mynivel', 'mystatus']
+handler.tags = ['roles']
+
+export default handler
