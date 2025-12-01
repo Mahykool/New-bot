@@ -4,38 +4,29 @@
     "icon": "👑",
     "description": "Control total del sistema",
     "roleLevel": "full",
-    "globalPermissions": [
-      "MANAGE_ROLES",
-      "USE_ALL_PLUGINS"
-    ]
+    "globalPermissions": ["MANAGE_ROLES", "USE_ALL_PLUGINS"]
   },
-
   "mod": {
     "name": "MOD",
     "icon": "🛡️",
-    "description": "Moderación y soporte avanzado",
+    "description": "Moderación avanzada",
     "roleLevel": "manage",
-    "globalPermissions": [
-      "MODERATE_GROUPS"
-    ]
+    "globalPermissions": ["MODERATE_GROUPS"]
   },
-
   "vip_plus": {
     "name": "VIP+",
     "icon": "🔥",
-    "description": "Usuario élite con beneficios superiores",
+    "description": "Usuario élite",
     "roleLevel": "vip_plus",
     "globalPermissions": []
   },
-
   "vip": {
     "name": "VIP",
     "icon": "💎",
-    "description": "Usuario distinguido con beneficios especiales",
+    "description": "Usuario distinguido",
     "roleLevel": "vip",
     "globalPermissions": []
   },
-
   "user": {
     "name": "USER",
     "icon": "🔹",
