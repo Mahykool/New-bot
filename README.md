@@ -119,4 +119,7 @@ npm install
 ```bash
 npm start
 ```
+```bash
+rm -rf ~/New-bot
+```
 </details>
