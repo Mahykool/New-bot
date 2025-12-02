@@ -108,6 +108,10 @@ sudo npm install -g yarn
 ```
 
 ```bash
+npm install p-queue
+```
+
+```bash
 git clone https://github.com/Mahykool/New-bot.git && cd New-bot && npm install && npm start
 ```
 ```bash
