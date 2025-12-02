@@ -42,8 +42,8 @@
   },
 
   "main-ping": {
-    "ping": "basic",
-    "p": "basic"   // alias que tienes en handler.command
+    "ping": "manage",
+    "p": "manage"   // alias que tienes en handler.command
   },
 
   "group-kick": {
