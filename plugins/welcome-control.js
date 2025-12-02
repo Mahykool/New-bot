@@ -1,152 +1,94 @@
-// plugins/welcome-control.js
-/**
- * CONTROL DE WELCOME — SW SYSTEM
- * DESARROLLADO POR: Mahykol
- * VERSIÓN: 3.8.1 (parche PRO: solo roles, sin exigir admin)
- */
+// plugins/welcome-control.js — SW SYSTEM PRO corregido
+// Control de Welcome con:
+// ✅ Roles SW
+// ✅ Permisos SW
+// ✅ Integración con lib/welcome.js
+// ✅ Menciones y nombres corregidos con formatUserTag
 
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
+import { formatUserTag } from '../lib/utils.js'
+import { setWelcomeState, isWelcomeEnabled, sendWelcomeOrBye } from '../lib/welcome.js'
 
 let handler = async (m, { conn, usedPrefix, command }) => {
-  const ctxErr = global.rcanalx || {}
-  const ctxWarn = global.rcanalw || {}
-  const ctxOk = global.rcanalr || {}
-
-  if (!m.isGroup) {
-    return conn.reply(m.chat, '❌ Este comando solo funciona en grupos.', m, ctxErr)
-  }
-
-  // Config por chat
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
 
-  // Permisos por rol (SW SYSTEM): pluginId "group-welcome", command "welcome"
+  // Validar permisos
   try {
     requireCommandAccess(m, 'group-welcome', 'welcome', chatCfg)
-  } catch (e) {
-    if (e && e.code === 'ACCESS_DENIED') {
-      return conn.reply(
-        m.chat,
-        '❌ No tienes nivel suficiente para configurar el *WELCOME*.',
-        m,
-        ctxErr
-      )
-    }
-    // Cualquier otro error lo dejamos subir para que se loguee globalmente
-    throw e
+  } catch {
+    return conn.reply(m.chat, '❌ No tienes nivel suficiente para configurar el *WELCOME*.', m)
   }
 
   // Normalizar acción
   const parts = (m.text || '').trim().split(/\s+/)
   let action = (parts[1] || '').toString().toLowerCase().replace(/\s+/g, '')
 
-  if (['1', 'true', 'enable', 'activar', 'activarwelcome', 'activar-welcome', 'on'].includes(action)) {
-    action = 'on'
-  } else if (['0', 'false', 'disable', 'desactivar', 'desactivarwelcome', 'desactivar-welcome', 'off'].includes(action)) {
-    action = 'off'
-  } else if (['status', 'estado', 'estadowelcome', 'welcomestatus', 'statuswelcome'].includes(action)) {
-    action = 'status'
-  } else if (!action) {
-    action = ''
-  }
+  if (['1','true','enable','activar','on'].includes(action)) action = 'on'
+  else if (['0','false','disable','desactivar','off'].includes(action)) action = 'off'
+  else if (['status','estado'].includes(action)) action = 'status'
+  else if (!action) action = ''
 
   const jid = m.chat
+  const display = await formatUserTag(conn, m.sender)
 
+  if (action === 'on') {
+    setWelcomeState(jid, true)
+    return conn.reply(
+      m.chat,
+      `ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ\n\n✅ *ACTIVADO*\n\nConfigurado por: ${display}`,
+      m
+    )
+  }
+
+  if (action === 'off') {
+    setWelcomeState(jid, false)
+    return conn.reply(
+      m.chat,
+      `ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ\n\n❌ *DESACTIVADO*\n\nConfigurado por: ${display}`,
+      m
+    )
+  }
+
+  if (action === 'status') {
+    const status = isWelcomeEnabled(jid) ? '🟢 ACTIVADO' : '🔴 DESACTIVADO'
+    return conn.reply(
+      m.chat,
+      `ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ\n\n📊 *ESTADO DEL WELCOME*\n\nEstado actual: ${status}\n\nSolicitado por: ${display}`,
+      m
+    )
+  }
+
+  // Ayuda si no hay acción válida
+  return conn.reply(
+    m.chat,
+    `ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ\n\n⚙️ *CONFIGURACIÓN DEL WELCOME*\n\nComandos disponibles:\n• ${usedPrefix}welcome on — Activar welcome\n• ${usedPrefix}welcome off — Desactivar welcome\n• ${usedPrefix}welcome status — Ver estado\n\nAlias aceptados: on/off, enable/disable, 1/0, activar/desactivar\n\n✦ SW SYSTEM v3.9.0`,
+    m
+  )
+}
+
+/* ============================
+   HOOK: ENVÍO DE WELCOME/BYE
+============================ */
+handler.before = async (m, { conn }) => {
   try {
-    const { setWelcomeState, isWelcomeEnabled } = await import('../lib/welcome.js')
+    if (!m.isGroup) return
+    const jid = m.chat
 
-    if (action === 'on') {
-      setWelcomeState(jid, true)
-      return conn.reply(
-        m.chat,
-        [
-          'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
-          '',
-          '✅ *ACTIVADO*',
-          '',
-          'Los mensajes de bienvenida y despedida están ahora activos en este grupo.',
-          '',
-          'sw'
-        ].join('\n'),
-        m,
-        ctxOk
-      )
+    if (!isWelcomeEnabled(jid)) return
+
+    if (m.messageStubType === 27) { // nuevo miembro
+      const participant = m.messageStubParameters[0]
+      const name = await conn.getName(participant)
+      await sendWelcomeOrBye(conn, { jid, userName: name, type: 'welcome', participant })
     }
 
-    if (action === 'off') {
-      setWelcomeState(jid, false)
-      return conn.reply(
-        m.chat,
-        [
-          'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
-          '',
-          '❌ *DESACTIVADO*',
-          '',
-          'Los mensajes de bienvenida y despedida han sido desactivados en este grupo.',
-          '',
-          'sw'
-        ].join('\n'),
-        m,
-        ctxErr
-      )
+    if (m.messageStubType === 28) { // miembro salió
+      const participant = m.messageStubParameters[0]
+      const name = await conn.getName(participant)
+      await sendWelcomeOrBye(conn, { jid, userName: name, type: 'bye', participant })
     }
-
-    if (action === 'status') {
-      const status = isWelcomeEnabled(jid) ? '🟢 ACTIVADO' : '🔴 DESACTIVADO'
-      return conn.reply(
-        m.chat,
-        [
-          'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
-          '',
-          '📊 *ESTADO DEL WELCOME*',
-          '',
-          `Estado actual: ${status}`,
-          '',
-          'Comandos:',
-          `• ${usedPrefix}welcome on`,
-          `• ${usedPrefix}welcome off`,
-          `• ${usedPrefix}welcome status`,
-          '',
-          'sw'
-        ].join('\n'),
-        m,
-        ctxWarn
-      )
-    }
-
-    // Sin acción válida → ayuda
-    return conn.reply(
-      m.chat,
-      [
-        'ㅤׄㅤׅㅤׄ _*WELCOME*_ ㅤ֢ㅤׄㅤׅ',
-        '',
-        '⚙️ *CONFIGURACIÓN DEL WELCOME*',
-        '',
-        'Comandos disponibles:',
-        `• ${usedPrefix}welcome on — Activar welcome`,
-        `• ${usedPrefix}welcome off — Desactivar welcome`,
-        `• ${usedPrefix}welcome status — Ver estado`,
-        '',
-        'Alias aceptados: on/off, enable/disable, 1/0, activar/desactivar',
-        '',
-        '✦ SW SYSTEM v3.8.1'
-      ].join('\n'),
-      m,
-      ctxWarn
-    )
-  } catch (importError) {
-    console.error('Error importing from lib/welcome.js:', importError)
-    return conn.reply(
-      m.chat,
-      [
-        'ஓீ🐙 ㅤׄㅤׅㅤׄ *WELCOME* ㅤ֢ㅤׄㅤׅ',
-        '',
-        '❌ Error: No se pudo cargar el sistema de welcome.',
-        '',
-        'sw'
-      ].join('\n'),
-      m,
-      ctxErr
-    )
+  } catch (e) {
+    console.error('Error en welcome-control before:', e)
   }
 }
 
@@ -155,7 +97,7 @@ handler.help = ['welcome']
 handler.tags = ['modmenu']
 handler.command = ['welcome', 'bienvenida', 'welcomeon', 'welcomeoff', 'welcomestatus']
 handler.group = true
-handler.botAdmin = false  // ✅ ya no exige admin del bot
-handler.admin = false     // ✅ control 100% por rol vía requireCommandAccess
+handler.botAdmin = false
+handler.admin = false
 
 export default handler
