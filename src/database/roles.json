@@ -1,0 +1,37 @@
+{
+  "creador": {
+    "name": "CREADOR",
+    "icon": "👑",
+    "description": "Control total del sistema",
+    "roleLevel": "full",
+    "globalPermissions": ["MANAGE_ROLES", "USE_ALL_PLUGINS"]
+  },
+  "mod": {
+    "name": "MOD",
+    "icon": "🛡️",
+    "description": "Moderación avanzada",
+    "roleLevel": "manage",
+    "globalPermissions": ["MODERATE_GROUPS"]
+  },
+  "vip_plus": {
+    "name": "VIP+",
+    "icon": "🔥",
+    "description": "Usuario élite",
+    "roleLevel": "vip_plus",
+    "globalPermissions": []
+  },
+  "vip": {
+    "name": "VIP",
+    "icon": "💎",
+    "description": "Usuario distinguido",
+    "roleLevel": "vip",
+    "globalPermissions": []
+  },
+  "user": {
+    "name": "USER",
+    "icon": "🔹",
+    "description": "Usuario estándar",
+    "roleLevel": "basic",
+    "globalPermissions": []
+  }
+}
