@@ -1,8 +1,18 @@
 // plugins/group-antilink.js — Versión PRO FINAL SW corregida
+// Antilink con:
+// ✅ Roles SW
+// ✅ Permisos SW
+// ✅ Shadowban progresivo
+// ✅ Expulsión automática
+// ✅ Menciones y nombres corregidos con formatUserTag
+
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { normalizeJid } from '../lib/lib-roles.js'
 import { formatUserTag } from '../lib/utils.js'
 
+/* ============================
+   CONFIG
+============================ */
 const STRIKE_RESET_HOURS = 24
 const STRIKE_ACTIONS = {
   1: { type: 'shadowban', minutes: 5 },
@@ -12,15 +22,26 @@ const STRIKE_ACTIONS = {
 
 const LINK_PATTERNS = [
   /https?:\/\/[^\s]+/gi,
+  /www\.[^\s]+/gi,
   /chat\.whatsapp\.com\/[A-Za-z0-9]+/gi,
   /t\.me\/[^\s]+/gi,
-  /discord\.gg\/[^\s]+/gi
+  /instagram\.com\/[^\s]+/gi,
+  /facebook\.com\/[^\s]+/gi,
+  /youtube\.com\/[^\s]+/gi,
+  /youtu\.be\/[^\s]+/gi,
+  /twitter\.com\/[^\s]+/gi,
+  /x\.com\/[^\s]+/gi,
+  /discord\.gg\/[^\s]+/gi,
+  /tiktok\.com\/[^\s]+/gi
 ]
 
 function formatTitle() {
   return 'ㅤׄㅤׅㅤׄ _*ANTILINK*_ ㅤ֢ㅤㅤׅ'
 }
 
+/* ============================
+   STRIKES
+============================ */
 if (!global.antilinkStrikes) global.antilinkStrikes = {}
 
 function getStrikes(chat, user) {
@@ -49,6 +70,9 @@ function addStrike(chat, user) {
   return global.antilinkStrikes[key].count
 }
 
+/* ============================
+   COMANDO PRINCIPAL
+============================ */
 let handler = async (m, { conn, args, usedPrefix }) => {
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
   try {
@@ -61,7 +85,11 @@ let handler = async (m, { conn, args, usedPrefix }) => {
   if (!global.antilinkStatus) global.antilinkStatus = {}
 
   if (!action) {
-    return conn.reply(m.chat, `${formatTitle()}\n\n➤ ${usedPrefix}antilink on\n➤ ${usedPrefix}antilink off\n➤ ${usedPrefix}antilink status`, m)
+    return conn.reply(
+      m.chat,
+      `${formatTitle()}\n\n➤ ${usedPrefix}antilink on\n➤ ${usedPrefix}antilink off\n➤ ${usedPrefix}antilink status`,
+      m
+    )
   }
 
   switch (action) {
@@ -79,6 +107,9 @@ let handler = async (m, { conn, args, usedPrefix }) => {
   }
 }
 
+/* ============================
+   BEFORE: DETECCIÓN DE LINKS
+============================ */
 handler.before = async (m, { conn }) => {
   try {
     if (!m.isGroup || !global.antilinkStatus?.[m.chat]) return
@@ -88,6 +119,8 @@ handler.before = async (m, { conn }) => {
     if (!hasLink) return
 
     const sender = normalizeJid(m.sender)
+    if (!sender) return
+
     const display = await formatUserTag(conn, sender)
 
     await conn.sendMessage(m.chat, {
@@ -95,13 +128,34 @@ handler.before = async (m, { conn }) => {
       mentions: [sender]
     })
 
+    try {
+      if (typeof conn.deleteMessage === 'function') {
+        await conn.deleteMessage(m.chat, m.key)
+      } else {
+        await conn.sendMessage(m.chat, { delete: m.key })
+      }
+    } catch {}
+
     const strikes = addStrike(m.chat, sender)
     const action = STRIKE_ACTIONS[strikes] || STRIKE_ACTIONS[3]
 
     await conn.sendMessage(m.chat, {
-      text: `${formatTitle()}\nStrike: *${strikes}/3*\nAcción: ${action.type}`,
+      text: `${formatTitle()}\nStrike: *${strikes}/3*\nAcción: ${action.type === 'kick' ? 'Expulsión' : 'Shadowban ' + action.minutes + 'm'}`,
       mentions: [sender]
     })
+
+    if (action.type === 'shadowban') {
+      const fake = {
+        ...m,
+        text: `.shadowban @${sender.split('@')[0]} ${action.minutes}`,
+        sender: m.sender,
+        chat: m.chat,
+        isCommand: true
+      }
+      const extra = { conn, args: [sender, action.minutes], usedPrefix: '.', command: 'shadowban' }
+      const shadowPlugin = Object.values(global.plugins).find(p => p.command?.includes?.('shadowban'))
+      if (shadowPlugin?.default) await shadowPlugin.default.call(conn, fake, extra)
+    }
 
     if (action.type === 'kick') {
       await conn.groupParticipantsUpdate(m.chat, [sender], 'remove')
