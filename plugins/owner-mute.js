@@ -1,4 +1,4 @@
-// plugins/owner-mute.js — Versión FINAL SW
+// plugins/owner-mute.js — Versión FINAL SW corregida
 // Shadowban real con:
 // ✅ Persistencia
 // ✅ Auto-expiración
@@ -7,12 +7,13 @@
 // ✅ Protección de creador y mods
 // ✅ Integración con roles y permisos SW
 // ✅ Compatible con kick y antilink
+// ✅ Menciones y nombres corregidos con formatUserTag
 
 import fs from 'fs'
 import path from 'path'
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
 import { normalizeJid, getUserRoles } from '../lib/lib-roles.js'
-import { parseTarget } from '../lib/utils.js'
+import { parseTarget, formatUserTag } from '../lib/utils.js'
 
 /* ============================
    CONFIG
@@ -103,7 +104,6 @@ function scheduleUnshadow(jid, ms, conn) {
         })
       }
     } catch {}
-
   }, ms)
 
   const current = shadowMap.get(jid) || {}
@@ -139,10 +139,6 @@ async function tryDelete(conn, m) {
       await conn.sendMessage(m.chat, { delete: m.key })
       return
     }
-    if (typeof conn.revokeMessage === 'function') {
-      await conn.revokeMessage(m.chat, [m.key])
-      return
-    }
   } catch {}
 }
 
@@ -152,36 +148,24 @@ async function tryDelete(conn, m) {
 const handler = async (m, { conn, command }) => {
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
 
-  /* --- PERMISOS SW --- */
   try {
     requireCommandAccess(m, 'moderation-plugin', 'shadowban', chatCfg)
   } catch {
     return conn.reply(m.chat, `❌ No tienes permiso para usar este comando.`, m)
   }
 
-  /* --- RESOLVER TARGET --- */
   const rawTarget = parseTarget(m, [])
   const target = rawTarget ? normalizeJid(rawTarget) : null
+  if (!target) return conn.reply(m.chat, `⚠️ Debes responder o mencionar a un usuario.`, m)
 
-  if (!target) {
-    return conn.reply(m.chat, `⚠️ Debes responder o mencionar a un usuario.`, m)
-  }
+  const display = await formatUserTag(conn, target)
 
-  const tag = `@${target.split('@')[0]}`
-
-  /* ============================
-     PROTECCIÓN DEL CREADOR
-  ============================ */
+  const targetRoles = getUserRoles(target).map(r => r.toLowerCase())
   const creators = []
   if (Array.isArray(global.owner)) creators.push(...global.owner)
   if (global.ownerJid) creators.push(global.ownerJid)
   if (global.ownerNumber) creators.push(global.ownerNumber)
-
-  const normalizedCreators = creators
-    .map(o => normalizeJid(Array.isArray(o) ? o[0] : o))
-    .filter(Boolean)
-
-  const targetRoles = getUserRoles(target).map(r => r.toLowerCase())
+  const normalizedCreators = creators.map(o => normalizeJid(Array.isArray(o) ? o[0] : o)).filter(Boolean)
 
   const isCreator =
     normalizedCreators.includes(target) ||
@@ -190,12 +174,7 @@ const handler = async (m, { conn, command }) => {
 
   if (isCreator) {
     const punisher = normalizeJid(m.sender)
-    if (punisher === target) {
-      return conn.reply(m.chat, `❌ No puedes shadowbanearte a ti mismo.`, m)
-    }
-
     const expiresAt = Date.now() + 5 * 60 * 1000
-
     shadowMap.set(punisher, {
       expiresAt,
       actor: 'system',
@@ -204,41 +183,28 @@ const handler = async (m, { conn, command }) => {
       immutable: true,
       timeoutId: null
     })
-
     saveShadowbans()
     scheduleUnshadow(punisher, expiresAt - Date.now(), conn)
     auditLog(`IMMUTABLE-SHADOW ${punisher} (attempted shadowban creator)`)
 
-    await conn.reply(
-      m.chat,
-      `💀 *Intentaste shadowbanear al creador*\nHas sido castigado por 5 minutos.`,
-      m,
-      { mentions: [punisher] }
-    )
-    return
+    const displayPunisher = await formatUserTag(conn, punisher)
+    return conn.reply(m.chat, `💀 Intentaste shadowbanear al creador\nHas sido castigado: ${displayPunisher}`, m, { mentions: [punisher] })
   }
 
-  /* ============================
-     PROTECCIÓN DE MODERADORES
-  ============================ */
   if (targetRoles.includes('mod') || targetRoles.includes('moderador')) {
     return conn.reply(m.chat, `❌ No puedes shadowbanear a un moderador.`, m)
   }
 
-  /* ============================
-     SHADOWBAN / UNSHADOWBAN
-  ============================ */
   const parts = (m.text || '').trim().split(/\s+/)
   const minutes = parseInt(parts[1], 10)
   const isDuration = !isNaN(minutes) && minutes > 0
 
   if (command === 'shadowban' || command === 'mute') {
     if (shadowMap.has(target)) {
-      return conn.reply(m.chat, `⚠️ El usuario ya está shadowbaneado: ${tag}`, m, { mentions: [target] })
+      return conn.reply(m.chat, `⚠️ El usuario ya está shadowbaneado: ${display}`, m, { mentions: [target] })
     }
 
     const expiresAt = isDuration ? Date.now() + minutes * 60 * 1000 : null
-
     shadowMap.set(target, {
       expiresAt,
       actor: normalizeJid(m.sender),
@@ -247,82 +213,32 @@ const handler = async (m, { conn, command }) => {
       immutable: false,
       timeoutId: null
     })
-
     saveShadowbans()
     auditLog(`SHADOW ${target} by ${normalizeJid(m.sender)} duration=${isDuration ? minutes + 'm' : 'perm'}`)
 
     if (isDuration) {
       scheduleUnshadow(target, expiresAt - Date.now(), conn)
-      return conn.reply(
-        m.chat,
-        `✨ *Shadowban aplicado*\nUsuario: ${tag}\nDuración: ${minutes} minutos.`,
-        m,
-        { mentions: [target] }
-      )
+      return conn.reply(m.chat, `✨ Shadowban aplicado\nUsuario: ${display}\nDuración: ${minutes} minutos.`, m, { mentions: [target] })
     } else {
-      return conn.reply(
-        m.chat,
-        `🔒 *Shadowban permanente aplicado*\nUsuario: ${tag}`,
-        m,
-        { mentions: [target] }
-      )
+      return conn.reply(m.chat, `🔒 Shadowban permanente aplicado\nUsuario: ${display}`, m, { mentions: [target] })
     }
   }
 
   if (command === 'unshadowban' || command === 'unmute') {
     const entry = shadowMap.get(target)
-    if (!entry) {
-      return conn.reply(m.chat, `⚠️ El usuario no está shadowbaneado: ${tag}`, m, { mentions: [target] })
-    }
-
-    if (entry.immutable) {
-      return conn.reply(m.chat, `❌ Este shadowban es inmutable.`, m)
-    }
+    if (!entry) return conn.reply(m.chat, `⚠️ El usuario no está shadowbaneado: ${display}`, m, { mentions: [target] })
+    if (entry.immutable) return conn.reply(m.chat, `❌ Este shadowban es inmutable.`, m)
 
     if (entry.timeoutId) clearTimeout(entry.timeoutId)
-
     shadowMap.delete(target)
     saveShadowbans()
     auditLog(`UNSHADOW ${target} by ${normalizeJid(m.sender)}`)
 
-    return conn.reply(
-      m.chat,
-      `✅ *Shadowban removido*\nUsuario: ${tag}`,
-      m,
-      { mentions: [target] }
-    )
+    return conn.reply(m.chat, `✅ Shadowban removido\nUsuario: ${display}`, m, { mentions: [target] })
   }
 }
 
 /* ============================
    BEFORE: BORRADO AUTOMÁTICO
 ============================ */
-handler.before = async (m, { conn }) => {
-  try {
-    if (!m || !m.sender) return
-
-    const sender = normalizeJid(m.sender)
-    const entry = shadowMap.get(sender)
-    if (!entry) return
-
-    if (m.mtype === 'stickerMessage') return
-
-    await tryDelete(conn, m)
-  } catch (e) {
-    console.error('shadowban before error:', e)
-  }
-}
-
-/* ============================
-   EXPORT
-============================ */
-handler.help = ['shadowban', 'unshadowban']
-handler.tags = ['modmenu']
-handler.command = ['shadowban', 'unshadowban', 'mute', 'unmute']
-handler.group = true
-handler.botAdmin = false
-
-loadShadowbans()
-scheduleAllTimeouts()
-
-export default handler
+handler.before = async
