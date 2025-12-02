@@ -16,6 +16,10 @@ import { loadDatabase, saveDatabase, DB_PATH } from './lib/db.js'
 import { watchFile } from 'fs'
 import { yukiJadiBot } from './plugins/sockets-serbot.js'
 import { getUserRolesMap, saveUserRolesMap, normalizeJid } from './lib/lib-roles.js' // <-- import añadido para sincronización
+import { validateCommands } from './validate-commands.js'
+
+// cuando ya tengas global.plugins cargado:
+validateCommands(global.plugins)
 
 const phoneUtil = (libPhoneNumber.PhoneNumberUtil || libPhoneNumber.default?.PhoneNumberUtil).getInstance()
 
