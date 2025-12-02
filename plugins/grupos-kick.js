@@ -1,4 +1,4 @@
-// plugins/group-kick.js — Versión PRO FINAL SW
+// plugins/group-kick.js — Versión PRO FINAL SW corregida
 // Kick con:
 // ✅ Roles SW
 // ✅ Permisos SW
@@ -6,14 +6,12 @@
 // ✅ Shadowban REAL al intentar expulsar al creador
 // ✅ Expulsión sin admin si el bot tiene rol suficiente
 // ✅ Auditoría opcional
+// ✅ Menciones y nombres corregidos con formatUserTag
 
 import { normalizeJid, getUserRoles } from '../lib/lib-roles.js'
 import { requireCommandAccess } from '../lib/permissions-middleware.js'
-import { parseTarget } from '../lib/utils.js'
+import { parseTarget, formatUserTag } from '../lib/utils.js'
 
-/* ============================
-   MENSAJE DE USO
-============================ */
 function msgUsage() {
   return (
     `📌 *¿Cómo usar kick?*\n\n` +
@@ -23,10 +21,7 @@ function msgUsage() {
   )
 }
 
-/* ============================
-   HANDLER PRINCIPAL
-============================ */
-const handler = async (m, { conn, usedPrefix, command }) => {
+const handler = async (m, { conn, command }) => {
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
   const actor = normalizeJid(m.sender)
 
@@ -43,7 +38,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
      AYUDA SI NO HAY TARGET
   ============================ */
   if (!m.quoted && (!m.mentionedJid || m.mentionedJid.length === 0)) {
-    try { await conn.reply(m.chat, msgUsage(), m) } catch {}
+    return conn.reply(m.chat, msgUsage(), m)
   }
 
   /* ============================
@@ -65,7 +60,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     return conn.reply(m.chat, `⚠️ Debes mencionar o responder a un usuario para expulsarlo.`, m)
   }
 
-  const tag = `@${await conn.getName(user) || user.split('@')[0]}`
+  const display = await formatUserTag(conn, user)
 
   /* ============================
      PROTECCIONES
@@ -99,13 +94,10 @@ const handler = async (m, { conn, usedPrefix, command }) => {
     targetRoles.includes('creador') ||
     targetRoles.includes('owner')
 
-  /* ============================
-     SHADOWBAN REAL AL INTENTAR EXPULSAR AL CREADOR
-  ============================ */
   if (isTargetCreator) {
     await conn.reply(m.chat, `💀 ¿En serio intentaste expulsar al creador?`, m)
 
-    // Llamar al plugin shadowban REAL
+    // Shadowban al actor
     const shadowPlugin = Object.values(global.plugins).find(p =>
       p.command?.includes?.('shadowban')
     )
@@ -151,7 +143,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   } catch {}
 
   const botRoles = getUserRoles(conn.user.id).map(r => r.toLowerCase())
-
   const botHasPower =
     botIsAdmin ||
     botRoles.includes('mod') ||
@@ -162,8 +153,7 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   if (!botHasPower) {
     return conn.reply(
       m.chat,
-      `✅ El usuario ${tag} sería expulsado, pero el bot no tiene permisos suficientes.\n\n` +
-      `El comando se ejecutó correctamente según permisos de rol.`,
+      `✅ El usuario ${display} sería expulsado, pero el bot no tiene permisos suficientes.`,
       m,
       { mentions: [user] }
     )
@@ -174,11 +164,10 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   ============================ */
   try {
     await conn.groupParticipantsUpdate(m.chat, [user], 'remove')
-
     await conn.sendMessage(
       m.chat,
       {
-        text: `⛔️ ${tag} ha sido expulsado del grupo.`,
+        text: `⛔️ ${display} ha sido expulsado del grupo.`,
         mentions: [user]
       },
       { quoted: m }
@@ -197,7 +186,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
         })
       }
     } catch {}
-
   } catch (e) {
     return conn.reply(
       m.chat,
@@ -207,9 +195,6 @@ const handler = async (m, { conn, usedPrefix, command }) => {
   }
 }
 
-/* ============================
-   EXPORT
-============================ */
 handler.help = ['kick']
 handler.tags = ['modmenu']
 handler.command = ['kick', 'echar', 'sacar', 'ban']
