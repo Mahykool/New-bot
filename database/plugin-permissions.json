@@ -21,7 +21,8 @@
 
   "main-menu": {
     "menu": "basic",
-    "help": "basic"
+    "help": "basic",
+    "Swill": "basic"   // alias que tienes en handler.command
   },
 
   "antilink": {
@@ -34,20 +35,29 @@
 
   "welcome": {
     "welcome": "manage",
-    "bienvenida": "manage"
+    "bienvenida": "manage",
+    "welcomeon": "manage",
+    "welcomeoff": "manage",
+    "welcomestatus": "manage"
   },
 
   "main-ping": {
-    "ping": "basic"
+    "ping": "basic",
+    "p": "basic"   // alias que tienes en handler.command
   },
 
   "group-kick": {
-    "kick": "manage"
+    "kick": "manage",
+    "echar": "manage",
+    "sacar": "manage",
+    "ban": "manage"
   },
 
   "moderation-plugin": {
     "shadowban": "manage",
-    "unshadowban": "manage"
+    "unshadowban": "manage",
+    "mute": "manage",
+    "unmute": "manage"
   },
 
   "wm": {
