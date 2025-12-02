@@ -1,26 +1,27 @@
 {
   "__defaults__": {
-    "command": "manage"
+    "command": "basic"
   },
-    "roles-management": {
-      "rolmenu": "basic",
-      "whois": "basic",
-      "roleinfo": "basic",
-      "grouproles": "basic",
-      "roles": "basic",
-      "setrole": "full",
-      "addrole": "full",
-      "removerole": "full",
-      "setpluginrole": "full",
-      "role-reload": "full",
-      "role-list": "full",
-      "rolelist": "full"
-    }
+
+  "roles-management": {
+    "rolesmenu": "basic",
+    "roleinfo": "basic",
+    "roles": "basic",
+    "setrole": "full",
+    "addrole": "full",
+    "removerole": "full"
   },
+
   "main-menu": {
     "menu": "basic",
     "help": "basic"
   },
+  
+  "main-menu": {
+    "menu": "basic",
+    "help": "basic"
+  },
+  
   "antilink": {
     "antilink": "manage",
     "on": "manage",
@@ -28,30 +29,37 @@
     "status": "manage",
     "toggle": "manage"
   },
+  
   "welcome": {
     "welcome": "manage",
     "bienvenida": "manage"
   },
+  
   "main-ping": {
     "ping": "basic"
   },
+  
   "group-kick": {
     "kick": "manage"
   },
+  
   "moderation-plugin": {
     "shadowban": "manage",
     "unshadowban": "manage"
   },
+  
   "owner-mute": {
     "shadowban": "manage",
     "unshadowban": "manage"
   },
+  
   "wm": {
     "take": "basic",
     "robar": "basic",
     "wm": "basic",
     "sticker": "basic"
   },
+  
   "respect-cmd": {
     "mirespect": "basic",
     "respecttop": "basic",
@@ -62,11 +70,13 @@
     "respectset": "full",
     "respectrango": "basic"
   },
+  
   "random-sticker": {
     "rsticker": "basic",
     "randsticker": "basic",
     "randomsticker": "basic"
   },
+  
   "nable": {
     "enable": "full",
     "disable": "full",
@@ -76,8 +86,6 @@
     "false": "full",
     "1": "full",
     "0": "full"
-  },
-  "__defaults__": {
-    "command": "manage"
+
   }
 }
