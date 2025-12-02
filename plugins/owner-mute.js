@@ -148,18 +148,21 @@ async function tryDelete(conn, m) {
 const handler = async (m, { conn, command }) => {
   const chatCfg = global.db?.data?.chats?.[m.chat] || {}
 
+  // Permisos SW
   try {
     requireCommandAccess(m, 'moderation-plugin', 'shadowban', chatCfg)
   } catch {
     return conn.reply(m.chat, `❌ No tienes permiso para usar este comando.`, m)
   }
 
+  // Target
   const rawTarget = parseTarget(m, [])
   const target = rawTarget ? normalizeJid(rawTarget) : null
   if (!target) return conn.reply(m.chat, `⚠️ Debes responder o mencionar a un usuario.`, m)
 
   const display = await formatUserTag(conn, target)
 
+  // Protecciones
   const targetRoles = getUserRoles(target).map(r => r.toLowerCase())
   const creators = []
   if (Array.isArray(global.owner)) creators.push(...global.owner)
@@ -195,10 +198,12 @@ const handler = async (m, { conn, command }) => {
     return conn.reply(m.chat, `❌ No puedes shadowbanear a un moderador.`, m)
   }
 
+  // Duración
   const parts = (m.text || '').trim().split(/\s+/)
   const minutes = parseInt(parts[1], 10)
   const isDuration = !isNaN(minutes) && minutes > 0
 
+  // Aplicar shadowban
   if (command === 'shadowban' || command === 'mute') {
     if (shadowMap.has(target)) {
       return conn.reply(m.chat, `⚠️ El usuario ya está shadowbaneado: ${display}`, m, { mentions: [target] })
@@ -224,6 +229,7 @@ const handler = async (m, { conn, command }) => {
     }
   }
 
+  // Remover shadowban
   if (command === 'unshadowban' || command === 'unmute') {
     const entry = shadowMap.get(target)
     if (!entry) return conn.reply(m.chat, `⚠️ El usuario no está shadowbaneado: ${display}`, m, { mentions: [target] })
@@ -241,4 +247,31 @@ const handler = async (m, { conn, command }) => {
 /* ============================
    BEFORE: BORRADO AUTOMÁTICO
 ============================ */
-handler.before = async
+handler.before = async (m, { conn }) => {
+  try {
+    if (!m || !m.sender) return
+    const sender = normalizeJid(m.sender)
+    const entry = shadowMap.get(sender)
+    if (!entry) return
+    if (m.mtype === 'stickerMessage') return
+    await tryDelete(conn, m)
+  } catch (e) {
+    console.error('shadowban before error:', e)
+  }
+}
+
+/* ============================
+   PROPS DEL HANDLER
+============================ */
+handler.help = ['shadowban', 'unshadowban', 'mute', 'unmute']
+handler.tags = ['modmenu']
+handler.command = ['shadowban', 'unshadowban', 'mute', 'unmute']
+handler.group = true
+handler.botAdmin = false
+handler.admin = false
+
+// Inicializar persistencia al cargar el plugin
+loadShadowbans()
+scheduleAllTimeouts()
+
+export default handler
