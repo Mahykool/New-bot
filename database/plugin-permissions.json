@@ -1,0 +1,142 @@
+{
+  "__defaults__": { "command": "basic" },
+
+  "roles-management": {
+    "rolesmenucreador": "full",
+    "addrolec": "full",
+    "removerolec": "full",
+    "setrolec": "full",
+    "nofunka": "full"
+  },
+
+  "roles-admin-menu": {
+    "rolesmenumods": "manage",
+    "memods": "manage",
+    "addrolem": "manage",
+    "removerolem": "manage",
+    "setrolem": "manage"
+  },
+
+  "roles-user-menu": {
+    "rolesmenu": "basic",
+    "rolesdisponibles": "basic",
+    "rolbest": "basic"
+  },
+
+  "main-menu": {
+    "menu": "basic",
+    "help": "basic",
+    "menuswill": "basic",
+    "swill": "basic"
+  },
+
+  "settings": {
+    "enable": "full",
+    "disable": "full",
+    "on": "full",
+    "off": "full",
+    "true": "full",
+    "false": "full",
+    "1": "full",
+    "0": "full"
+  },
+
+  "group-antilink": {
+    "antilink": "manage",
+    "antilinkon": "manage",
+    "antilinkoff": "manage",
+    "antilinkstatus": "manage"
+  },
+
+  "group-kick": {
+    "kick": "manage",
+    "echar": "manage",
+    "sacar": "manage",
+    "ban": "manage",
+    "fuistee": "manage",
+    "techingee": "manage",
+    "baneado": "manage"
+  },
+
+  "group-add": {
+    "add": "manage"
+  },
+
+  "group-tagall": {
+    "tagall": "vip_plus"
+  },
+
+  "group-delete": {
+    "delete": "manage",
+    "del": "manage",
+    "borrar": "manage"
+  },
+
+  "main-ping": {
+    "p": "basic",
+    "ping": "basic"
+  },
+
+  "moderation-plugin": {
+    "shadowban": "manage",
+    "unshadowban": "manage",
+    "mute": "manage",
+    "unmute": "manage"
+  },
+
+  "random-sticker": {
+    "rsticker": "basic",
+    "randsticker": "basic",
+    "randomsticker": "basic"
+  },
+
+  "respect-cmd": {
+    "mirespect": "basic",
+    "respecttop": "basic",
+    "respectreset": "basic",
+    "respectinfo": "basic",
+    "respectgive": "basic",
+    "respecttake": "basic",
+    "respectset": "basic",
+    "respectrango": "basic",
+    "respectmenu": "basic"
+  },
+
+  "sockets-botlist": {
+    "botlist": "full",
+    "listbots": "full",
+    "listbot": "full",
+    "bots": "full",
+    "sockets": "full",
+    "socket": "full"
+  },
+
+  "sockets-serbot": {
+    "qr": "full",
+    "code": "full"
+  },
+
+  "group-welcome": {
+    "welcome": "manage",
+    "bienvenida": "manage",
+    "welcomeon": "manage",
+    "welcomeoff": "manage",
+    "welcomestatus": "manage",
+    "welcometest": "manage"
+  },
+
+  "wm": {
+    "take": "basic",
+    "robar": "basic",
+    "wm": "basic",
+    "sticker": "basic"
+  },
+
+  "game-freefire": {
+    "free": "basic",
+    "freefire": "basic",
+    "ffid": "basic",
+    "free_fire": "basic",
+    "ff": "basic"
+  }
+}
