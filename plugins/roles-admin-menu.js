@@ -1,0 +1,127 @@
+// plugins/roles-admin-menu.js
+import {
+  getUserRoles,
+  getUserLevel,
+  listRoles,
+  addUserRole,
+  removeUserRole,
+  getRoleInfo,
+  normalizeJid
+} from '../lib/lib-roles.js'
+
+import { resolveAliasToJid, ensureJid } from '../lib/utils.js'
+
+/* ============================
+   Resolver de target completo
+============================ */
+async function resolveTarget(conn, m, args) {
+  // 1) Respuesta a un mensaje
+  if (m.quoted?.sender) return normalizeJid(m.quoted.sender)
+
+  // 2) Menciones reales
+  if (Array.isArray(m.mentionedJid) && m.mentionedJid.length > 0) {
+    return normalizeJid(m.mentionedJid[0])
+  }
+
+  // 3) Token explícito después del comando
+  if (args[0]) {
+    let raw = String(args[0]).replace(/^@+/, '').replace(/,+$/g, '').trim()
+
+    // Primero intenta resolver alias
+    const aliasJid = await resolveAliasToJid(conn, m, raw)
+    if (aliasJid) return normalizeJid(aliasJid)
+
+    // Luego intenta número limpio
+    const ensured = ensureJid(raw)
+    if (ensured) return normalizeJid(ensured)
+  }
+
+  return null
+}
+
+/* ============================
+   Handler principal
+============================ */
+const handler = async (m, { conn, args, command }) => {
+  const sender = m.sender
+  const senderNorm = normalizeJid(sender)
+  const roles = getUserRoles(senderNorm)
+  const level = getUserLevel(senderNorm)
+  const roleInfo = getRoleInfo(level)
+
+  // Validación de permisos: si no tiene rol suficiente, solo reaccionamos con ✖
+  if (!roles.includes('mod') && !roles.includes('vip') && !roles.includes('vip_plus')) {
+    return conn.sendMessage(m.chat, { react: { text: '✖', key: m.key } })
+  }
+
+  // Resolver target con alias/mención/reply/número
+  const target = await resolveTarget(conn, m, args)
+  if (!target) return m.reply('⚠️ Debes mencionar, responder o usar un alias válido.')
+  const targetNorm = normalizeJid(target)
+  if (!targetNorm) return m.reply('⚠️ No se pudo normalizar el usuario.')
+
+  // el rol siempre será el último argumento
+  const role = args[args.length - 1]
+  const allowedRolesForMods = ['vip', 'vip_plus']
+  const allRoles = listRoles()
+
+  if (['addrolem', 'removerolem', 'setrolem'].includes(command)) {
+    if (!role) return m.reply('⚠️ Debes indicar un rol.')
+    if (!allowedRolesForMods.includes(role)) {
+      // Intento de modificar un rol superior → mensaje + shadowban
+      m.reply('¿En serio intentaste?💀')
+      conn.sendMessage(
+        m.chat,
+        { text: `#shadowban @${sender.split('@')[0]} 15` },
+        { mentions: [senderNorm] }
+      )
+      return
+    }
+  }
+
+  if (command === 'addrolem') {
+    const ok = addUserRole(targetNorm, role)
+    return m.reply(
+      ok ? `✅ Rol añadido: *${role}*` : '⚠️ Ese usuario ya tiene ese rol.',
+      null,
+      { mentions: [targetNorm] }
+    )
+  }
+
+  if (command === 'removerolem') {
+    const ok = removeUserRole(targetNorm, role)
+    return m.reply(
+      ok ? `✅ Rol removido: *${role}*` : '⚠️ Ese usuario no tiene ese rol.',
+      null,
+      { mentions: [targetNorm] }
+    )
+  }
+
+  if (command === 'setrolem') {
+    const current = getUserRoles(targetNorm)
+    for (const r of current) removeUserRole(targetNorm, r)
+    addUserRole(targetNorm, role)
+    return m.reply(`✅ Rol establecido: *${role}*`, null, { mentions: [targetNorm] })
+  }
+
+  if (command === 'memods') {
+    let txt = `🛡️ *MENÚ DE MODERACIÓN DE ROLES*\n\n`
+    txt += `👤 Usuario: @${senderNorm.split('@')[0]}\n`
+    txt += `🎭 Roles: ${roles.length ? roles.join(', ') : `${roleInfo.icon} ${roleInfo.name}`}\n`
+    txt += `📖 Descripción: ${roleInfo.description}\n\n`
+    txt += `⚙️ Acciones rápidas (solo VIP y VIP+):\n• .addrolem @user <rol>\n• .removerolem @user <rol>\n• .setrolem @user <rol>\n\n`
+    txt += `📌 Roles disponibles:\n\n`
+    for (const r of allRoles) {
+      txt += `${r.icon || ''} *${r.role}*\n• Nivel: ${r.level}\n• ${r.description}\n\n`
+    }
+
+    return m.reply(txt, null, { mentions: [senderNorm] })
+  }
+}
+
+handler.help = ['menumods', 'addrolem', 'removerolem', 'setrolem']
+handler.tags = []
+handler.command = ['menumods', 'addrolem', 'removerolem', 'setrolem']
+handler.group = true
+
+export default handler

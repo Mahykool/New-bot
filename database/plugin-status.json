@@ -1,0 +1,147 @@
+{
+  "aliases": {
+    "pluginsstatus": "Estado de Plugins",
+    "pluginson": "Activar Plugins",
+    "pluginsoff": "Desactivar Plugins",
+    "settings": "Config Global",
+    "_roles-confirm": "Roles-Confirm",
+    "group-delete": "Borrar Msg",
+    "group-add": "Agregar User",
+    "group-link": "Link Grupo",
+    "group-tagall": "TagAll",
+    "antilink": "Antilink",
+    "group-kick": "Expulsar",
+    "freefire-uid": "FF UID",
+    "main-menu": "Menú Principal",
+    "main-ping": "Ping SW",
+    "owner-menu": "Silenciar",
+    "plugins-control": "Plugins Ctrl",
+    "random-sticker": "Sticker Rand",
+    "respect-cmd": "Respect Cmd",
+    "respect-menu": "Respect Menú",
+    "rolbest": "Ascenso Rol",
+    "roles-admin-menu": "Roles Mods",
+    "roles-management": "Roles Creador",
+    "roles-user-menu": "Roles User",
+    "rolesdisponibles": "Roles Disp",
+    "rolesmenucreador": "Menú Creador",
+    "rolesmenumods": "Menú Mods",
+    "sockets-botlist": "BotList",
+    "sockets-serbot": "SerBot",
+    "sticker-maker": "Sticker Maker",
+    "group-welcome": "Bienvenida",
+    "wm": "Gangstar Stickers",
+    "grupos-kick": "grupos-kick",
+    "juegos-freefire": "Consulta perfiles de Free Fire por UID",
+    "owner-mute": "owner-mute",
+    "welcome-control": "welcome-control",
+    "_nable": "_nable",
+    "delete-message": "delete-message",
+    "groupos-antilink": "groupos-antilink",
+    "group-tagall-trigger": "group-tagall-trigger"
+  },
+  "groups": {
+    "undefined": {
+      "mode": "full",
+      "pluginsstatus": {
+        "active": true
+      },
+      "pluginson": {
+        "active": true
+      },
+      "pluginsoff": {
+        "active": true
+      },
+      "settings": {
+        "active": true
+      },
+      "_roles-confirm": {
+        "active": true
+      },
+      "group-delete": {
+        "active": true
+      },
+      "group-add": {
+        "active": true
+      },
+      "group-link": {
+        "active": true
+      },
+      "group-tagall": {
+        "active": true
+      },
+      "antilink": {
+        "active": true
+      },
+      "group-kick": {
+        "active": true
+      },
+      "freefire-uid": {
+        "active": true
+      },
+      "main-menu": {
+        "active": true
+      },
+      "main-ping": {
+        "active": true
+      },
+      "owner-menu": {
+        "active": true
+      },
+      "plugins-control": {
+        "active": true
+      },
+      "random-sticker": {
+        "active": true
+      },
+      "respect-cmd": {
+        "active": true
+      },
+      "respect-menu": {
+        "active": true
+      },
+      "rolbest": {
+        "active": true
+      },
+      "roles-admin-menu": {
+        "active": true
+      },
+      "roles-management": {
+        "active": true
+      },
+      "roles-user-menu": {
+        "active": true
+      },
+      "rolesdisponibles": {
+        "active": true
+      },
+      "rolesmenucreador": {
+        "active": true
+      },
+      "rolesmenumods": {
+        "active": true
+      },
+      "sockets-botlist": {
+        "active": true
+      },
+      "sockets-serbot": {
+        "active": true
+      },
+      "sticker-maker": {
+        "active": true
+      },
+      "group-welcome": {
+        "active": true
+      },
+      "wm": {
+        "active": true
+      },
+      "grupos-kick": {
+        "active": true
+      }
+    },
+    "120363423663675265@g.us": {
+      "mode": "none"
+    }
+  }
+}

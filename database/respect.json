@@ -1,0 +1,37 @@
+{
+  "56969066865@s.s.": {
+    "respect": 5,
+    "robCount": 1,
+    "windowStart": 1764658722787,
+    "totalRobs": 1,
+    "punishLevel": 0
+  },
+  "56969066865@s.whatsapp.net": {
+    "respect": 45,
+    "robCount": 3,
+    "windowStart": 1764793433253,
+    "totalRobs": 9,
+    "punishLevel": 0
+  },
+  "5363684780@s.whatsapp.net": {
+    "respect": 40,
+    "robCount": 3,
+    "windowStart": 1764795424492,
+    "totalRobs": 10,
+    "punishLevel": 0
+  },
+  "56951513764@s.whatsapp.net": {
+    "respect": 20,
+    "robCount": 1,
+    "windowStart": 1764789692106,
+    "totalRobs": 4,
+    "punishLevel": 0
+  },
+  "50671409841@s.whatsapp.net": {
+    "respect": 5,
+    "robCount": 1,
+    "windowStart": 1764795451438,
+    "totalRobs": 1,
+    "punishLevel": 0
+  }
+}
